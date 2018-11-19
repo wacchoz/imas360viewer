@@ -1,0 +1,165 @@
+// ToonFragment
+
+float4 		g_Diffuse; 		// = {1.0f, 1.0f, 1.0f, 1.0f};	// Diffuse color of the material
+
+float  		g_Luminance = 1.0f;
+float  		g_Hue = 1.0f;
+float  		g_Saturation = 1.0f;
+
+float  		g_ToonHM = 0.45f; //トーン閾値High/Middle
+float  		g_ToonML = 0.5f; //トーン閾値Middle/Low
+
+float4 g_colorKeyLight	= { 1.0f,  1.0f,  1.0f,  1.0f};
+float3 g_colorLoDelta	= {-0.1f, -0.2f, -0.2f};
+float3 g_colorHiDelta	= { 0.2f,  0.2f,  0.2f};
+
+float3 g_dirKeyLight		= { 0.523f,  0.454f,  0.721};//{ 0.523f,  0.454f,  0.721f};
+float3 g_dirHighLight	= { 0.275f,  0.454f, -0.847f};
+
+float4 g_colorBloom		= { 0.7f,  0.7f,  0.7f,  1.0f};
+float3 g_dirBloom		= { 0.000f,  0.707f, -0.707f};
+
+//------------------------------------------------------------------------
+// Name : Desaturate, RGB2HSL, HSL2RGB
+// Desc : RGB/HSV変換
+//------------------------------------------------------------------------
+
+float3 RGB2HSV(float3 RGB)
+{
+    float3 HSV = 0;
+	float minVal = min(min(RGB.r, RGB.g), RGB.b);
+	float maxVal = max(max(RGB.r, RGB.g), RGB.b);
+    float delta = maxVal - minVal;		//Delta RGB value 
+    HSV.z = maxVal;
+    if (maxVal != 0.0)	HSV.y = delta / maxVal;
+	else				HSV.y = 0.0;
+    // If gray, leave H & S at zero
+	if      ( RGB.x == maxVal ) HSV.x =       (RGB.y - RGB.z) / delta;
+    else if ( RGB.y == maxVal ) HSV.x = 2.0 + (RGB.z - RGB.x) / delta;
+    else                        HSV.x = 4.0 + (RGB.x - RGB.y) / delta;
+	HSV.x /= 6.0;
+    HSV.x = frac(HSV.x);
+    return (HSV);
+}
+
+float3 Hue(float H)
+{
+	H = frac(H);
+    float R = abs(H * 6 - 3) - 1;
+    float G = 2 - abs(H * 6 - 2);
+    float B = 2 - abs(H * 6 - 4);
+    return saturate(float3(R,G,B));
+}
+
+float3 HSV2RGB(in float3 HSV)
+{
+    return ((Hue(HSV.x) - 1) * HSV.y + 1) * HSV.z;
+}
+
+float3 Desaturate(float3 color, float Desaturation)
+{
+	float3 grayXfer = float3(0.3, 0.59, 0.11);
+	float  grayf = dot(grayXfer, color);
+	float3 gray = float3(grayf, grayf, grayf);
+	return float3(lerp(color, gray, Desaturation));
+}
+
+//-----------------------------------------------------------------------------
+// Name: colorADJ
+// Desc: Color Adjustment of RGB, YCC, HSL, HSV image format without Toon
+//-----------------------------------------------------------------------------
+
+float3 colorAdj( float4 decal)
+{
+	float3  DiffYCC;
+	float3  Color;
+		
+	// アンチ飽和処理?
+	decal.rgb = Desaturate(decal.rgb, 0.1f);
+
+	DiffYCC = RGB2HSV(decal.rgb);
+	DiffYCC.z *= g_Luminance;
+	DiffYCC.x += g_Hue;		
+	DiffYCC.y *= g_Saturation;	
+	Color.rgb = HSV2RGB(DiffYCC);
+
+    return Color;
+}
+
+
+//-----------------------------------------------------------------------------
+// Name: toon
+// Desc: Toon Shading
+//-----------------------------------------------------------------------------
+
+float3 toon( float4 decal, float LdotKey, float LdotHigh, float shadowValue)
+{
+	float3	shiftRGB = 0;
+
+	float3	color = decal.rgb * g_colorKeyLight.rgb;
+	float3	hiDelta = (1.2f - color) * g_colorHiDelta; //白飛び防止	
+	float3	loDelta = (0.2f + color) * g_colorLoDelta; //黒つぶれ防止
+	
+	if (LdotKey < g_ToonML) //法線でLo Color判定
+	{
+		color += loDelta; //画素にLo Light色差を足す(マイナスなので実際は引く)。
+		//Lo Colorの場合、シャドーは省略
+	}
+	else
+	{
+		shiftRGB = loDelta; //シャドー用色差（=Lo Color）をセット
+		
+		if (LdotHigh > g_ToonHM) //法線でHigh Light判定
+		{
+			color += hiDelta; //画素にHigh Light色差を足す。
+			shiftRGB -= hiDelta; //シャドーが掛かっている場合に備えてシフトしておく
+		}
+				
+		//シャドウ合成
+		 color += (1.0f - shadowValue) * shiftRGB;
+	}	
+	return color;
+}
+
+
+void mainPS(
+	float2 texCoord : TEXCOORD0,
+	float3 normal : TEXCOORD1,
+
+	out float4 outColor : COLOR,
+	uniform sampler2D diffuseSampler,
+	uniform sampler2D specularSampler,
+	uniform float bSpecular
+	)
+{
+	float2 uv = 0.5f - normal.xy * 0.5;
+	float4 decal = tex2D(diffuseSampler, texCoord);
+	float4 specular = tex2D(specularSampler, uv);
+
+	float3 Normal = normalize( normal );
+	float LdotKey = dot( Normal, normalize( g_dirKeyLight )) * 0.5f + 0.5f;
+	float LdotHigh = dot( Normal, normalize( g_dirHighLight )) * 0.5f + 0.5f;
+	float LdotBloom = saturate( dot( Normal, normalize( g_dirBloom ) ) );
+
+	outColor.rgb = toon( decal, LdotKey, LdotHigh, 1.0);	// no shadow
+
+	outColor.rgb = colorAdj( outColor );
+
+//	outColor.rgb += g_colorBloom.rgb * LdotBloom;
+
+	outColor.a = 1;//g_Diffuse.a;
+
+
+	if(bSpecular>0)
+	{
+		outColor.rgb = outColor.rgb + 0.7 * decal.a * specular.rgb * specular.a;
+		outColor.a = decal.a + specular.a;
+	}else{
+//		outColor = diffuse;
+		outColor.a = decal.a;
+	}
+
+}
+
+
+

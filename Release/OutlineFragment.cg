@@ -1,0 +1,9 @@
+// OutlineFragment
+
+void mainPS2(
+	out float4 outColor : COLOR
+	)
+{
+	outColor.rgb = 0.0f;
+}
+

@@ -1,0 +1,18 @@
+// OutlineVertex
+
+void mainVS2(
+	float4 position : POSITION,
+	float4 normal : NORMAL,
+	float2 texCoord : TEXCOORD0,
+	out float4 outPos : POSITION,
+	uniform float4x4 ModelViewProj,
+	uniform float4x4 ModelView
+	)
+{	
+	float4 pos = mul(ModelViewProj, position);
+	float4 n = mul(normal, ModelViewProj);
+	n.zw=0;
+
+	// ’¸“_‚ğ–@ü•ûŒü‚ÉˆÚ“®
+	outPos = pos + n * 0.025f;
+}

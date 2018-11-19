@@ -35,11 +35,24 @@ Describe 3D model file *.bna in command line argument.
 -Windows  
 -GLUT, GLUI .... User interface library of OpenGL  
 -libsquish .... decode DXT format [https://sourceforge.net/projects/libsquish/](https://sourceforge.net/projects/libsquish/)  
--DirectX9 .... using library for vector, matrix, quartenion
+-DirectX9 .... using library for vector, matrix, quartenion  
+-Cg .... shader  
 
 
 # Demo
 
-![yayoi_glui1](./image/yayoi_glui1.png)
-![yayoi_glui2](./image/yayoi_glui2.png)
+## Release 0.1
+Rendering with Cg shader
+
+<img src="./image/yayoi_glui3.png" width=500>
+
+## Release 0.0
+Simple model viewer
+
+<img src="./image/yayoi_glui1.png" width=500>
+<img src="./image/yayoi_glui2.png" width=500>
+
+
+
+
 
