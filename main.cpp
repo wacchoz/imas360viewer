@@ -5,14 +5,14 @@
 
 using namespace std;
 
-// OpenGL関係
+// OpenGL
 #include <GL/glut.h>
 #include <GL/glui.h>
 #pragma comment(lib, "glut32.lib")
 #pragma comment(lib, "glui32.lib")
 #pragma comment(lib, "squish.lib")	// http://code.google.com/p/libsquish/
 
-// 行列関係
+// matrix and quaternion calculation
 #pragma comment(lib, "d3dx9.lib")	//  DirectX SDK
 
 void init();
@@ -22,13 +22,13 @@ void idle();
 void gluiCallbackExit(int num);
 void gluiCallbackReset(int num);
 
-// Cg関係
+// Cg
 #include <Cg/cg.h>
 #include <Cg/cgGL.h>
 #pragma comment(lib, "cg.lib")
 #pragma comment(lib, "cgGL.lib")
 
-// その他
+// other
 #pragma comment(lib, "shlwapi.lib")		// PathRemoveFileSpec()
 
 // im@s
@@ -36,13 +36,16 @@ void gluiCallbackReset(int num);
 
 DanceScene g_dancescene;
 
-// GLUI関係グローバル変数
+// global parameter of GLUI
 GLUI_Rotation *g_view_rot;
 GLUI_Translation *g_view_transXY;
 GLUI_Translation *g_view_transZ;
-int g_bWireframe = 0;
+GLUI_RadioGroup  *radio;
+int g_radioVal=0;		// render_mode
+int g_bEnablePhysics = 1;
+int g_bShowRig = 0;
 int g_bShowInfo = 1;
-int g_bImasCamera = 0;
+int g_bImasCamera = 1;
 
 float g_rotate[16] = {
   1.0f, 0.0f, 0.0f, 0.0f,
@@ -70,14 +73,14 @@ int main( int argc, char* argv[] )
 		cout << "using setting file : " << argv[1] << endl;
 	}else
 	{
-		// settings.iniのパス
+		// path of settings.ini
 		PathRemoveFileSpec( argv[0] );
 		ini_path = argv[0];
 		ini_path = ini_path.append("\\settings.ini");
 		cout << "using default setting file : " << ini_path << endl;
 	}
 
-	// シーン初期化
+	// Initialize dance scene
 	DanceScene::Input input;
 
 	char str[MAX_PATH];
@@ -101,18 +104,26 @@ int main( int argc, char* argv[] )
 	if( ! g_dancescene.Init( input ) ) return EXIT_FAILURE;
 
 
-	// GLUI関係初期化
-	GLUI *glui = GLUI_Master.create_glui( "control" );
+	// Initialize GLUI
+	GLUI* glui = GLUI_Master.create_glui( "control" );
 	g_view_rot = glui->add_rotation( "Rotation", g_rotate );
 	g_view_transXY = glui->add_translation( "TransXY With CTRL key", GLUI_TRANSLATION_XY, g_trans_XY );
 	g_view_transZ = glui->add_translation( "TransZ With CTRL key", GLUI_TRANSLATION_Z, g_trans_Z );
-	glui->add_checkbox( "wireframe", & g_bWireframe );
+
+	GLUI_Panel* pPanel = glui->add_panel("render mode");
+	GLUI_RadioGroup* pRadioGroup = glui->add_radiogroup_to_panel( pPanel, &g_radioVal );
+	glui->add_radiobutton_to_group( pRadioGroup, "mesh");
+	glui->add_radiobutton_to_group( pRadioGroup, "wireframe");
+	glui->add_radiobutton_to_group( pRadioGroup, "skeleton");
+	glui->add_checkbox( "Show Rig", & g_bShowRig );
+	glui->add_checkbox( "Enable Physics", & g_bEnablePhysics );
+
 	glui->add_checkbox( "Show info", & g_bShowInfo );
 	glui->add_checkbox( "Use im@s camera", & g_bImasCamera );
 	glui->add_button( "Reset", 0, gluiCallbackReset );
 	glui->add_button( "Exit", 0, gluiCallbackExit );
 
-	// GLUT関係
+	// GLUT
 	init();
 	glutReshapeFunc( reshape );
 	glutDisplayFunc( display );
@@ -143,29 +154,37 @@ void init()
 	glEnable( GL_DEPTH_TEST );
 	glShadeModel(GL_SMOOTH);
 
-    // テクスチャを拡大・縮小する方法の指定
     glTexParameteri( GL_TEXTURE_2D,  GL_TEXTURE_MAG_FILTER, GL_LINEAR );
     glTexParameteri( GL_TEXTURE_2D,  GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
 
-	// ブレンド方法の設定
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
-	// default視点設定
+	// default camera setting
 	gluLookAt( 0.0f, 10.0f, 40.0f, 0.0f, 10.0f, 0.0f, 0.0f, 1.0f, 0.0f );
 }
 
 
 void display()
 {
-	// 更新
 	static int startTime = glutGet(GLUT_ELAPSED_TIME);
 
-	int frame = (int)( (glutGet(GLUT_ELAPSED_TIME) - startTime ) / (1000.0f / 59.94f) );
+	float frame = (int)( (glutGet(GLUT_ELAPSED_TIME) - startTime ) / (1000.0f / 59.94f) );
 
-	g_dancescene.Update( frame );
+	g_dancescene.Update( frame , g_bEnablePhysics);
 
-	g_dancescene.Display(g_rotate, g_trans_XY, g_trans_Z, g_bWireframe, g_bShowInfo, g_bImasCamera);
+	switch( g_radioVal )
+	{
+	case 0:
+		g_dancescene.Display(g_rotate, g_trans_XY, g_trans_Z, DanceScene::MESH, g_bShowRig, g_bShowInfo, g_bImasCamera);
+		break;
+	case 1:
+		g_dancescene.Display(g_rotate, g_trans_XY, g_trans_Z, DanceScene::WIREFRAME, g_bShowRig, g_bShowInfo, g_bImasCamera);
+		break;
+	case 2:
+		g_dancescene.Display(g_rotate, g_trans_XY, g_trans_Z, DanceScene::SKELETON, g_bShowRig, g_bShowInfo, g_bImasCamera);
+		break;
+	}
 }
 
 

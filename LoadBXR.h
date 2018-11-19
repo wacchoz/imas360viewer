@@ -39,6 +39,11 @@ struct Motion
 	std::string param0;
 };
 
+struct Foce_mouth
+{
+	std::string param0;		// "all_open"
+};
+
 // リソース
 struct Words
 {
@@ -75,6 +80,7 @@ struct ScriptCommand
 {
 	int beat;	// 数値
 	Face face;				// 強制大文字
+	Foce_mouth foce_mouth;
 	Camera camera_a, camera_b, camera_c;
 	Motion motion;
 	Part part;
@@ -132,11 +138,22 @@ public:
 		return song;
 	}
 
-	// current_beatでの表情文字列、前の表情文字列、表情が変わった時のbeatを返す
-	void GetFace( const float current_beat, std::string & face_type, std::string & face_type_previous, int & change_face_beat )
+	// current_beatでの表情文字列、前の表情文字列、表情が変わった時のbeat、force_mouthの有無を返す
+	void GetFace( const float current_beat, std::string & face_type, std::string & face_type_previous, int & change_face_beat, bool & force_mouth )
 	{
 		for(int i=0; i < command.size(); i++)
 		{
+			if( command[i].beat <= current_beat && command[i].foce_mouth.param0 == "all_open" )
+			{
+				force_mouth = true;
+			}
+
+			// partコマンドでforce_mouthをcancel
+			if( command[i].beat <= current_beat && command[i].part.param0 != "" )
+			{
+				force_mouth = false;
+			}
+
 			if( command[i].beat <= current_beat && command[i].face.param0 != "" )
 			{
 				face_type_previous = face_type;
@@ -144,6 +161,7 @@ public:
 				face_type = command[i].face.param0;
 				change_face_beat = command[i].beat;
 			}
+
 			if( command[i].beat > current_beat ) break;
 		}
 	}
@@ -166,7 +184,6 @@ public:
 
 		return face_id;
 	}
-
 };
 
 };	// end of namespace

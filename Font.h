@@ -19,6 +19,8 @@ private:
 	HFONT m_FontU;
 	HDC m_hDC;
 public:
+	int m_size;
+
 	BitmapFont();
 	~BitmapFont();
 	bool CreateA(char* fontname, int size);

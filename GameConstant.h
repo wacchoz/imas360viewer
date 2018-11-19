@@ -15,6 +15,8 @@ extern std::map< std::string, float> g_bpm;
 extern std::map< std::string, float> g_scriptDelay;
 extern std::map< CHARACTER, int > g_chara2track;
 extern std::map< CHARACTER, int > g_chara2mpkID;
+extern std::map< CHARACTER, std::wstring > g_charaName;
+extern std::map< std::string, std::wstring> g_songName;
 
 }
 

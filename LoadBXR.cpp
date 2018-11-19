@@ -14,10 +14,10 @@ void LoadBXR_as_DanceScript(const imas::BXR & bxr, DanceScript& script )
 
 	for(int i = 0; i < bxr.mainScript.size(); i++)
 	{
-		// root‚Í“Ç‚Ý”ò‚Î‚µ
+		// skip "root"
 		if( bxr.mainScript[i].main_symbol =="root" ) continue;
 
-		// main_symbol‚ð“Ç‚ñ‚Å•ªŠòˆ—
+		// branch by main_symbol
 		if( bxr.mainScript[i].main_symbol == "beat")
 		{
 			command.beat = atoi( bxr.mainScript[i].sub_symbol.c_str() );
@@ -30,7 +30,16 @@ void LoadBXR_as_DanceScript(const imas::BXR & bxr, DanceScript& script )
 				subline = bxr.mainScript[i].indexSubScript;
 				do
 				{
-					if( bxr.subScript[ subline ].sub_symbol == "param0" ) command.face.param0 = ::toUpper( bxr.subScript[ subline ].symbol );	// ‹­§“I‚É‘å•¶Žš‚É
+					if( bxr.subScript[ subline ].sub_symbol == "param0" ) command.face.param0 = ::ToUpper( bxr.subScript[ subline ].symbol );	// ‹­§“I‚É‘å•¶Žš‚É
+				}while( bxr.subScript[ subline++ ].next != -1);
+			}
+			if( bxr.mainScript[i].sub_symbol == "foce_mouth")
+			{
+				int subline;
+				subline = bxr.mainScript[i].indexSubScript;
+				do
+				{
+					if( bxr.subScript[ subline ].sub_symbol == "param0" ) command.foce_mouth.param0 = bxr.subScript[ subline ].symbol;
 				}while( bxr.subScript[ subline++ ].next != -1);
 			}
 			if( bxr.mainScript[i].sub_symbol == "camera_a")
@@ -131,7 +140,7 @@ void LoadBXR_as_DanceScript(const imas::BXR & bxr, DanceScript& script )
 		else if( bxr.mainScript[i].main_symbol == "faces")
 		{
 			Faces face = Faces();
-			face.face_type = ::toUpper( bxr.mainScript[i].sub_symbol );	// ‹­§“I‚É‘å•¶Žš‚É
+			face.face_type = ::ToUpper( bxr.mainScript[i].sub_symbol );	// ‹­§“I‚É‘å•¶Žš‚É
 
 			int subline;
 			subline = bxr.mainScript[i].indexSubScript;
@@ -151,7 +160,7 @@ void LoadBXR_as_DanceScript(const imas::BXR & bxr, DanceScript& script )
 				else if( bxr.subScript[ subline ].sub_symbol == "param11" ) face.param[11] = atoi( bxr.subScript[ subline ].symbol.c_str() );
 			}while( bxr.subScript[ subline++ ].next != -1);
 
-			// “o˜^
+			// Register
 			script.faces.push_back( face );
 
 		}
@@ -169,12 +178,12 @@ void LoadBXR_as_DanceScript(const imas::BXR & bxr, DanceScript& script )
 		}
 
 
-		// ‚à‚µŽŸ‚ªbeat‚©I‚í‚è‚¾‚Á‚½‚ç“o˜^
+		// Regiser command if the next symbol is "beat" or script is ended.
 		if( i == bxr.mainScript.size() -1 || bxr.mainScript[i+1].main_symbol == "beat" )
 		{
 			script.command.push_back( command );
 
-			// command‚ðˆê“x‹ó‚É‚µ‚Ä‚¨‚­
+			// Clear command
 			command = ScriptCommand();
 		}	
 	}

@@ -91,12 +91,12 @@ public:
 
 		std::vector<unsigned int> dirOffset, filenameOffset, dataOffset, filesize;
 
-		out.WriteNullArray( 8 + 16* nFile );	// headerは後で
+		out.WriteNullArray( 8 + 16* nFile );	// header is written later
 
 
 		std::list<File>::iterator p;
 
-		// write directory name（重複を考慮しない）
+		// write directory name（duplication is not considered）
 		for( p = m_filelist.begin(); p != m_filelist.end(); ++p)
 		{
 			dirOffset.push_back( out.CurrentPosition() );
@@ -113,7 +113,7 @@ public:
 		// write data
 		for( p = m_filelist.begin(); p != m_filelist.end(); ++p)
 		{
-			out.WriteNullArray( 4096 - out.CurrentPosition() % 4096 );	// 作業性のためalignmentを大きめにとっておく
+			out.WriteNullArray( 4096 - out.CurrentPosition() % 4096 );	// this large alignment is for workability of manual edit.
 
 			dataOffset.push_back( out.CurrentPosition() );
 			filesize.push_back( (*p).FileSize() );
@@ -141,7 +141,7 @@ public:
 
 	}
 
-	void ExtractAllFiles()	// ディレクトリ名は無視している
+	void ExtractAllFiles()	// directory name is neglected
 	{
 		printf("Now Extracting...\n");
 

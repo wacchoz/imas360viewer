@@ -55,6 +55,8 @@ bool BitmapFont::CreateA(char *fontname, int size)
         FIXED_PITCH | FF_MODERN,	//ピッチとファミリー
         fontname);					//書体名
 
+	m_size = size;
+
 	if ( m_FontA == NULL )
 		return false;
 
@@ -85,6 +87,8 @@ bool BitmapFont::CreateW(wchar_t *fontname, int size)
         ANTIALIASED_QUALITY,		//出力品質
         FIXED_PITCH | FF_MODERN,	//ピッチとファミリー
         fontname);					//書体名
+
+	m_size = size;
 
 	if ( m_FontU == NULL )
 		return false;

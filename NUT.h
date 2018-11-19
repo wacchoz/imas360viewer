@@ -14,9 +14,9 @@ namespace imas{
 
 struct TextureData
 {
-	//	int texture_data_size;	// ヘッダを含むサイズ
+	//	int texture_data_size;		// size including header
 	int unknown0;
-	//	int image_data_size;		// ヘッダを含まないサイズ
+	//	int image_data_size;		// size except for header
 	//	int header_size;
 	int unknown1;
 	int nMipmap;
@@ -44,10 +44,10 @@ struct TextureData
 	int GIDX;
 	int unknown12;
 
-	// imageの実データ
+	// raw data of image
 	std::vector<unsigned char> raw_texture;
 
-	// imageの展開データ(squishで展開)
+	// decompressed image data (decompressed by libsquish)
 	std::vector<unsigned char> decompressed_texture;
 
 
@@ -83,7 +83,7 @@ struct TextureData
 			}
 		}
 		
-		// ここに16byte alignmentのためのpaddingあるため、飛ばす
+		// skip padding for 16byte alignment
 
 		pFile->Skip( (16-pFile->CurrentPosition()%16)%16 );
 
@@ -113,7 +113,7 @@ struct TextureData
 		raw_texture.resize( image_data_size );
 		pFile->ReadByteArray( & raw_texture[0], image_data_size );
 
-		Decompress();	// 展開
+		Decompress();
 
 		return true;
 	}
@@ -132,7 +132,7 @@ struct TextureData
 				case 2:
 					decompress_type = squish::kDxt5; break;
 			}
-			// エンディアン
+			// change endian
 			std::vector<unsigned char> tmp_texture = raw_texture;
 			for(int k = 0; k < tmp_texture.size() / 2; k++){
 				unsigned char tmp;
@@ -140,7 +140,7 @@ struct TextureData
 				tmp_texture[k*2] = tmp_texture[k*2+1];
 				tmp_texture[k*2+1]=tmp;
 			}
-			// squishで展開
+			// decompress by libsquish
 			decompressed_texture.resize( width * height * 4);
 			squish::DecompressImage(& decompressed_texture[0], width, height, &tmp_texture[0], decompress_type);
 		}

@@ -28,13 +28,11 @@ namespace{
 
 class File
 {
-	//データ
 private:
 	std::vector<unsigned char> m_data;
 	std::string m_filename;
 	std::string m_directory;
 
-	// I/O用
 public:
 	enum Endian{ BIG_ENDIAN, LITTLE_ENDIAN };
 private:
