@@ -43,7 +43,7 @@ private:
 	unsigned int m_currentPos;	// m_topPosÇ0Ç∆ÇµÇΩÇ∆Ç´ÇÃåªç›à íu
 
 public:
-	File(){}
+	File(): m_topPos(0), m_currentPos(0){}
 	~File(){}
 
 	File(std::string filename, std::string directory = "", Endian endian = BIG_ENDIAN)
@@ -73,8 +73,8 @@ public:
 		FILE* fp;
 		fpos_t fposFileSize;
 
-		fp = fopen( & filename[0], "rb");
-		if( !fp ) return false;
+		errno_t err = fopen_s( &fp, & filename[0], "rb");
+		if( err ) return false;
 
 		fseek(fp, 0, SEEK_END);
 		fgetpos(fp, &fposFileSize);
@@ -89,7 +89,7 @@ public:
 		return true;
 	}
 
-	bool LoadFromMemory( unsigned char* pTop, int size, std::string filename="", std::string directory = "", Endian endian = BIG_ENDIAN )
+	bool LoadFromMemory( unsigned char* pTop, int size, std::string filename = "", std::string directory = "", Endian endian = BIG_ENDIAN )
 	{
 		m_data.resize(size);
 		memcpy(&m_data[0], pTop, size);
@@ -148,7 +148,8 @@ public:
 	void WriteToFile(std::string path)
 	{
 		FILE* fp;
-		fp = fopen(path.c_str(), "wb");
+		errno_t err = fopen_s(&fp, path.c_str(), "wb");
+		if( err ) return;
 		fwrite(&m_data[0], m_data.size(), 1, fp);
 		fclose(fp);
 	}

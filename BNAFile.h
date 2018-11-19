@@ -4,7 +4,7 @@
 #include "File.h"
 
 #include <list>
-
+#include <string>
 
 namespace imas{
 
@@ -13,10 +13,13 @@ class BNAFile
 {
 public:
 	std::list<File> m_filelist;		// listなら挿入削除でポインタが変わらないはずなので、Fileへのポインタを外に渡せる
+	std::string m_filename;
 
 public:
 	bool Load( std::string filename )
 	{
+		m_filename = filename;
+
 		File bna;
 		if( ! bna.LoadFromFile( filename, "", File::BIG_ENDIAN ) ) return false;
 
@@ -25,6 +28,8 @@ public:
 
 	bool Load( File* pFile )
 	{
+		m_filename = pFile->FileName();
+
 		if( pFile->ReadInt32() != 'BNA0' ) return false;
 
 		int nFile = pFile->ReadUInt32();

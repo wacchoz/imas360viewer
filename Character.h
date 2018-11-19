@@ -7,9 +7,18 @@
 
 #include <GL/glut.h>
 
+#include "Common.h"
+
 #include "BNAFile.h"
 #include "NUD.h"
 #include "NUT.h"
+#include "NUM.h"
+#include "SKL.h"
+
+#include "GameConstant.h"
+
+#include "Skeleton.h"
+#include "Motion.h"
 
 #include "Shader.h"
 
@@ -19,21 +28,53 @@ namespace imas{
 class Character
 {
 public:
+	enum Position{ CENTER, RIGHT, LEFT} position;
+
+	imas::CHARACTER charaName;
+
+	FacialPoseArray m_facialArray;
+
+public:
 //private:
 
 	imas::NUD m_NUD;
 	imas::NUT m_NUT;
 
+	Skeleton m_Skeleton;
+
 	std::map<int, GLuint> m_ID;	// GIDX ⇒ OpenGL用ID
 	
 	enum RenderType { RENDER_MESH, RENDER_OUTLINE, RENDER_LINE };
 
-
 public:
-	bool Load( std::string filename )
+	imas::CHARACTER GetName()
 	{
+		return charaName;
+	}
+
+	bool Load( std::string fullpath )
+	{
+		// キャラクター名自動取得	
+		{
+			std::string filename = ::fullPath2FileName( fullpath );
+			if(		 filename.find("har") != std::string::npos ) charaName = imas::HARUKA;
+			else if( filename.find("chi") != std::string::npos ) charaName = imas::CHIHAYA;
+			else if( filename.find("yuk") != std::string::npos ) charaName = imas::YUKIHO;
+			else if( filename.find("yay") != std::string::npos ) charaName = imas::YAYOI;
+			else if( filename.find("rit") != std::string::npos ) charaName = imas::RITSUKO;
+			else if( filename.find("azu") != std::string::npos ) charaName = imas::AZUSA;
+			else if( filename.find("ior") != std::string::npos ) charaName = imas::IORI;
+			else if( filename.find("mak") != std::string::npos ) charaName = imas::MAKOTO;
+			else if( filename.find("ami") != std::string::npos ) charaName = imas::AMI;
+			else if( filename.find("mam") != std::string::npos ) charaName = imas::MAMI;
+			else if( filename.find("mik") != std::string::npos ) charaName = imas::MIKI;
+			else if( filename.find("mis") != std::string::npos ) charaName = imas::MIKI_SHORT;
+			else
+				return false;		
+		}
+
 		imas::BNAFile bnafile;
-		if( ! bnafile.Load(filename) ) return false;
+		if( ! bnafile.Load(fullpath) ) return false;
 
 		// NUDファイル読み込み
 		{
@@ -46,6 +87,16 @@ public:
 			File* pFile = bnafile.GetFileByFilter(".nut");
 			if( pFile == NULL ) return false;
 			if( ! m_NUT.Load( pFile ) ) return false;
+		}
+		// NUNファイル読み込み
+		// SKLファイル読み込み
+		{
+			File* pFile = bnafile.GetFileByFilter(".skl");
+			if( pFile == NULL ) return false;
+			if( ! m_Skeleton.LoadSKL( pFile ) ) return false;
+
+			pFile = bnafile.GetFileByFilter(".num");
+			m_Skeleton.LoadInitialNUM( pFile );
 		}
 
 		// テクスチャ割り当て
@@ -71,6 +122,52 @@ public:
 		return true;
 	}
 
+	bool LoadFacialPoseArray( std::string staticmot_file )
+	{
+		if( ! m_facialArray.Load( staticmot_file, charaName) ) return false;
+		m_Skeleton.AttachFacialPoseArray( & m_facialArray );
+		return true;
+	}
+
+	void UpdateFaceEmotion( FacialPose& facialpose )
+	{
+		m_Skeleton.UpdateFaceEmotion( facialpose );
+	}
+
+	void UpdateFaceEmotion( int ID )
+	{
+		m_Skeleton.UpdateFaceEmotion( ID );
+	}
+
+	void UpdateFaceEmotionLERP( int faceID1, int faceID2, float t )	// t: 0.0-1.0
+	{
+		m_Skeleton.UpdateFaceEmotionLERP( faceID1, faceID2, t );
+	}
+
+	void UpdateBody( Pose& body_pose )
+	{
+		m_Skeleton.UpdateBody( body_pose );
+	}
+
+	void UpdateLip( LipPose& lip_pose )
+	{
+		m_Skeleton.UpdateLip( lip_pose );
+	}
+
+	void CloseLip()
+	{
+		m_Skeleton.CloseLip();
+	}
+
+	void UpdateSkinningMatrix()
+	{
+		m_Skeleton.UpdateSkinningMatrix();
+	}
+
+	void UpdateMesh()
+	{
+		m_NUD.Update( & m_Skeleton );
+	}
 
 	void Render( Shader* pShader, RenderType render_type = RENDER_MESH )
 	{
@@ -117,10 +214,13 @@ public:
 					{
 					case 0x10211011:
 					case 0x10211021:
-					case 0x10211031:
 					case 0x10211001:
 					case 0x10212011:
 						glDisable(GL_BLEND);
+						cgGLSetParameter1f(pShader->parameter["bSpecular"], 1.0f);
+						break;
+					case 0x10211031:
+						glEnable(GL_BLEND);
 						cgGLSetParameter1f(pShader->parameter["bSpecular"], 1.0f);
 						break;
 					case 0x10210011:

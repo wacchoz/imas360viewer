@@ -5,6 +5,7 @@
 #include <Cg/cgGL.h>
 
 #include <map>
+#include <iostream>
 
 class Shader
 {
@@ -28,7 +29,7 @@ public:
 		CGerror err = cgGetError();
 		if( err != CG_NO_ERROR )
 		{
-			printf("cg error: %s\n", cgGetErrorString(err) );
+			std::cout << "cg error: " << cgGetErrorString(err) << endl;
 			exit(1);
 		}
 	}
@@ -77,13 +78,13 @@ public:
 		vertexProfile = cgGLGetLatestProfile(CG_GL_VERTEX);
 		if ( vertexProfile == CG_PROFILE_UNKNOWN || vertexProfile == CG_INVALID_ENUMERANT_ERROR)
 		{
-			printf( "Error : Invalid Profile Type\n" );
+			std::cout << "Error : Invalid Profile Type" << endl;
 			exit(1);
 		}
 		fragmentProfile = cgGLGetLatestProfile(CG_GL_FRAGMENT);
 		if ( fragmentProfile == CG_PROFILE_UNKNOWN || fragmentProfile == CG_INVALID_ENUMERANT_ERROR)
 		{
-			printf( "Error : Invalid Profile Type\n" );
+			std::cout << "Error : Invalid Profile Type" << endl;
 			exit(1);
 		}
 
@@ -134,13 +135,13 @@ public:
 		vertexProfile = cgGLGetLatestProfile(CG_GL_VERTEX);
 		if ( vertexProfile == CG_PROFILE_UNKNOWN || vertexProfile == CG_INVALID_ENUMERANT_ERROR)
 		{
-			printf( "Error : Invalid Profile Type\n" );
+			std::cout << "Error : Invalid Profile Type" << endl;
 			exit(1);
 		}
 		fragmentProfile = cgGLGetLatestProfile(CG_GL_FRAGMENT);
 		if ( fragmentProfile == CG_PROFILE_UNKNOWN || fragmentProfile == CG_INVALID_ENUMERANT_ERROR)
 		{
-			printf( "Error : Invalid Profile Type\n" );
+			std::cout << "Error : Invalid Profile Type" << endl;
 			exit(1);
 		}
 

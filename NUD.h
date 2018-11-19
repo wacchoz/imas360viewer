@@ -5,6 +5,8 @@
 #include <vector>
 #include "d3dx9.h"
 
+#include "Skeleton.h"
+
 #include <assert.h>
 #include <set>
 
@@ -20,7 +22,7 @@ struct Index
 	int reserved;
 	int unknown;
 
-	bool Load( File* pFile)
+	bool Load( File* pFile )
 	{
 		// read Index of TRIANGLE_STRIP
 
@@ -89,14 +91,18 @@ struct Vertex
 
 	int unknown;
 
-	std::vector<D3DXVECTOR3> position;
-	std::vector<D3DXVECTOR3> normal;
+	std::vector<D3DXVECTOR3> position;	// motionで更新される
+	std::vector<D3DXVECTOR3> normal;	// motionで更新される
 	std::vector<D3DXVECTOR2> uv;
+
+	std::vector<D3DXVECTOR3> initial_position;
+	std::vector<D3DXVECTOR3> initial_normal;
+
 
 	std::vector<int> ID1, ID2, ID3, ID4;
 	std::vector<float> w1, w2, w3, w4;
 
-	bool Load( File* pFile)
+	bool Load( File* pFile )
 	{
 		unsigned short nVertex;
 		nVertex = pFile->ReadUInt16();
@@ -204,6 +210,10 @@ struct Vertex
 				assert( 0 && "unknown vertex type");
 				break;
 		} // switch
+
+		// コピーして初期状態を保存しておく
+		initial_position = position;
+		initial_normal = normal;
 
 		return true;
 	}
@@ -434,7 +444,7 @@ struct Mesh
 	int unknown2;
 	int unknown3;
 
-	int unknown_flag;
+	int unknown_flag;;
 
 	std::vector<Texture> texture;
 
@@ -728,6 +738,47 @@ public:
 		Write( & out );
 
 		out.WriteToFile();
+	}
+
+
+	void Update( Skeleton * pSkeleton )
+	{
+		std::vector<imas::MeshGroup>::iterator mg;
+		for(mg = meshgroup.begin(); mg != meshgroup.end(); ++mg)
+		{
+			std::vector<imas::Mesh>::iterator s;
+			for(s=(*mg).mesh.begin(); s!= (*mg).mesh.end(); ++s)
+			{
+				for(int i=0; i<(*s).vertex.position.size(); i++)
+				{
+					D3DXMATRIX tmp;
+
+					if((*s).vertex.ID1[i]==255){
+						D3DXMatrixIdentity(& tmp);
+					}else{
+						tmp =		pSkeleton->m_Joint[(*s).vertex.ID1[i]].matSkinningTransform * (*s).vertex.w1[i];
+					}
+					if((*s).vertex.ID2[i] != 255){
+						tmp = tmp +	pSkeleton->m_Joint[(*s).vertex.ID2[i]].matSkinningTransform * (*s).vertex.w2[i];
+					}
+					if((*s).vertex.ID3[i] != 255){
+						tmp = tmp +	pSkeleton->m_Joint[(*s).vertex.ID3[i]].matSkinningTransform * (*s).vertex.w3[i];
+					}
+					if((*s).vertex.ID4[i] != 255){
+						tmp = tmp +	pSkeleton->m_Joint[(*s).vertex.ID4[i]].matSkinningTransform * (*s).vertex.w4[i];
+					}
+
+					(*s).vertex.position[i].x = (*s).vertex.initial_position[i].x * tmp._11 + (*s).vertex.initial_position[i].y * tmp._21 + (*s).vertex.initial_position[i].z * tmp._31 + tmp._41;
+					(*s).vertex.position[i].y = (*s).vertex.initial_position[i].x * tmp._12 + (*s).vertex.initial_position[i].y * tmp._22 + (*s).vertex.initial_position[i].z * tmp._32 + tmp._42;
+					(*s).vertex.position[i].z = (*s).vertex.initial_position[i].x * tmp._13 + (*s).vertex.initial_position[i].y * tmp._23 + (*s).vertex.initial_position[i].z * tmp._33 + tmp._43;
+
+					(*s).vertex.normal[i].x = (*s).vertex.initial_normal[i].x * tmp._11 + (*s).vertex.initial_normal[i].y * tmp._21 + (*s).vertex.initial_normal[i].z * tmp._31;
+					(*s).vertex.normal[i].y = (*s).vertex.initial_normal[i].x * tmp._12 + (*s).vertex.initial_normal[i].y * tmp._22 + (*s).vertex.initial_normal[i].z * tmp._32;
+					(*s).vertex.normal[i].z = (*s).vertex.initial_normal[i].x * tmp._13 + (*s).vertex.initial_normal[i].y * tmp._23 + (*s).vertex.initial_normal[i].z * tmp._33;
+				}
+
+			}
+		}
 	}
 
 };

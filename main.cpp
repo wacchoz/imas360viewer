@@ -1,14 +1,19 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <iostream>
 #include <shlwapi.h>
-#pragma comment(lib, "shlwapi.lib")		// PathRemoveFileSpec()
+
+using namespace std;
 
 // OpenGL関係
 #include <GL/glut.h>
 #include <GL/glui.h>
 #pragma comment(lib, "glut32.lib")
 #pragma comment(lib, "glui32.lib")
-#pragma comment(lib, "squish.lib")
+#pragma comment(lib, "squish.lib")	// http://code.google.com/p/libsquish/
+
+// 行列関係
+#pragma comment(lib, "d3dx9.lib")	//  DirectX SDK
 
 void init();
 void display();
@@ -23,25 +28,21 @@ void gluiCallbackReset(int num);
 #pragma comment(lib, "cg.lib")
 #pragma comment(lib, "cgGL.lib")
 
-#include "Shader.h"
+// その他
+#pragma comment(lib, "shlwapi.lib")		// PathRemoveFileSpec()
 
-ToonShader g_ToonShader;
-OutlineShader g_OutlineShader;
+// im@s
+#include "DanceScene.h"
 
-// im@s関係
-#include "character.h"
-
-
-// グローバル変数
-imas::Character g_character;
-
-int g_width, g_height;
-int g_bWireframe = 0;
+DanceScene g_dancescene;
 
 // GLUI関係グローバル変数
 GLUI_Rotation *g_view_rot;
 GLUI_Translation *g_view_transXY;
 GLUI_Translation *g_view_transZ;
+int g_bWireframe = 0;
+int g_bShowInfo = 1;
+int g_bImasCamera = 0;
 
 float g_rotate[16] = {
   1.0f, 0.0f, 0.0f, 0.0f,
@@ -59,22 +60,45 @@ int main( int argc, char* argv[] )
 	glutInit( &argc, argv );
 	glutInitDisplayMode( GLUT_SINGLE | GLUT_RGBA | GLUT_DEPTH );
 	glutInitWindowPosition( 300, 50 );
-	glutInitWindowSize( 720, 720 );
+	glutInitWindowSize( 720*16/9, 720 );
 	glutCreateWindow("im@s - OpenGL version");
 
-	if( argc == 1 )
+	std::string ini_path;
+	if( argc == 2 )
 	{
-		printf("Error: No argument");
-		return EXIT_FAILURE;
-	}
-	else
+		ini_path = argv[1];
+		cout << "using setting file : " << argv[1] << endl;
+	}else
 	{
+		// settings.iniのパス
 		PathRemoveFileSpec( argv[0] );
-		SetCurrentDirectory( argv[0] );
-		std::string filename( argv[1] );
-		// BNAファイル読み込み。Characterクラスへ読み込み
-		if( ! g_character.Load( filename ) ) return EXIT_FAILURE;
+		ini_path = argv[0];
+		ini_path = ini_path.append("\\settings.ini");
+		cout << "using default setting file : " << ini_path << endl;
 	}
+
+	// シーン初期化
+	DanceScene::Input input;
+
+	char str[MAX_PATH];
+	GetPrivateProfileString("path", "CharaBNA1", NULL, str, MAX_PATH, ini_path.c_str() ); 	
+	input.chara_filename[0] = str;
+	GetPrivateProfileString("path", "CharaBNA2", NULL, str, MAX_PATH, ini_path.c_str() ); 	
+	input.chara_filename[1] = str;
+	GetPrivateProfileString("path", "CharaBNA3", NULL, str, MAX_PATH, ini_path.c_str() ); 	
+	input.chara_filename[2] = str;
+	GetPrivateProfileString("path", "staticmotBNA", NULL, str, MAX_PATH, ini_path.c_str() ); 	
+	input.staticmot_file = str;
+	GetPrivateProfileString("path", "danceBNA", NULL, str, MAX_PATH, ini_path.c_str() ); 	
+	input.dancefile = str;
+
+	std::string songname = fullPath2FileName( input.dancefile );
+	input.song = songname.substr(0, 3);
+
+	GetPrivateProfileString("path", "aix", NULL, str, MAX_PATH, ini_path.c_str() ); 	
+	input.songfile = str;
+	
+	if( ! g_dancescene.Init( input ) ) return EXIT_FAILURE;
 
 
 	// GLUI関係初期化
@@ -83,14 +107,12 @@ int main( int argc, char* argv[] )
 	g_view_transXY = glui->add_translation( "TransXY With CTRL key", GLUI_TRANSLATION_XY, g_trans_XY );
 	g_view_transZ = glui->add_translation( "TransZ With CTRL key", GLUI_TRANSLATION_Z, g_trans_Z );
 	glui->add_checkbox( "wireframe", & g_bWireframe );
+	glui->add_checkbox( "Show info", & g_bShowInfo );
+	glui->add_checkbox( "Use im@s camera", & g_bImasCamera );
 	glui->add_button( "Reset", 0, gluiCallbackReset );
 	glui->add_button( "Exit", 0, gluiCallbackExit );
 
-	// Cg関係初期化
-	g_ToonShader.Init();
-	g_OutlineShader.Init();
-
-	// 以下OpenGL関係
+	// GLUT関係
 	init();
 	glutReshapeFunc( reshape );
 	glutDisplayFunc( display );
@@ -121,9 +143,6 @@ void init()
 	glEnable( GL_DEPTH_TEST );
 	glShadeModel(GL_SMOOTH);
 
-//	glBindTexture(GL_TEXTURE_2D, 0);
-//	glEnable(GL_TEXTURE_2D);
-
     // テクスチャを拡大・縮小する方法の指定
     glTexParameteri( GL_TEXTURE_2D,  GL_TEXTURE_MAG_FILTER, GL_LINEAR );
     glTexParameteri( GL_TEXTURE_2D,  GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
@@ -132,91 +151,27 @@ void init()
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
-	// 視点設定
-	gluLookAt( 0.0f, 10.0f, 25.0f, 0.0f, 10.0f, 0.0f, 0.0f, 1.0f, 0.0f );
+	// default視点設定
+	gluLookAt( 0.0f, 10.0f, 40.0f, 0.0f, 10.0f, 0.0f, 0.0f, 1.0f, 0.0f );
 }
+
 
 void display()
 {
-	// 背景のクリア
-	glClearColor( 0.5f, 0.5f, 1.0f, 1.0f );
-	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-	
-	glMatrixMode( GL_MODELVIEW );
-	glPushMatrix();
+	// 更新
+	static int startTime = glutGet(GLUT_ELAPSED_TIME);
 
-		glTranslatef( g_trans_XY[0], g_trans_XY[1], g_trans_Z[0] );	//平行移動
-		glMultMatrixf( g_rotate );	// 回転
+	int frame = (int)( (glutGet(GLUT_ELAPSED_TIME) - startTime ) / (1000.0f / 59.94f) );
 
-		
-		// ワイヤフレーム切り替え
-		if( g_bWireframe == 0 )
-		{
-			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+	g_dancescene.Update( frame );
 
-			g_character.Render( & g_OutlineShader,  imas::Character::RENDER_OUTLINE );
-			g_character.Render( & g_ToonShader, imas::Character::RENDER_MESH );
-
-		}else
-		{
-			glLineWidth(1.0f);
-			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-
-			g_character.Render( & g_ToonShader, imas::Character::RENDER_LINE );
-		}
-		
-
-		// 座標軸描画
-		glDisable(GL_LIGHTING);
-		glLineWidth(3.0f);
-		glColor3f(1.0f,  0.0f,  0.0f);
-		glBegin(  GL_LINES  );
-			glVertex3f(0.0f,  0.0f,  0.0f);
-			glVertex3f(5.0f,  0.0f,  0.0f);
-		glEnd();
-
-		glColor3f(0.0f,  1.0f,  0.0f);
-		glBegin(  GL_LINES  );
-			glVertex3f(0.0f,  0.0f,  0.0f);
-			glVertex3f(0.0f,  5.0f,  0.0f);
-		glEnd();
-
-		glColor3f(0.0f,  0.0f,  1.0f);
-		glBegin(  GL_LINES  );
-			glVertex3f(0.0f,  0.0f,  0.0f);
-			glVertex3f(0.0f,  0.0f,  5.0f);
-		glEnd();
-
-
-	glPopMatrix();
-	
-	glutSwapBuffers();
-	glutPostRedisplay();
-
-	// FPS表示
-	{
-		static int frame = 0;
-		static int last_t;
-		int t = glutGet(GLUT_ELAPSED_TIME); 
-		if(t - last_t > 1000) { 
-			printf("%g    \r", (1000.0 * frame) / (t - last_t)); 
-			last_t = t; 
-			frame = 0; 
-		} 
-		frame++; 
-	}
+	g_dancescene.Display(g_rotate, g_trans_XY, g_trans_Z, g_bWireframe, g_bShowInfo, g_bImasCamera);
 }
 
 
-void reshape(int width, int height)
+void reshape( int width, int height )
 {
-	g_width = width;
-	g_height = height;
-
-	glViewport(0, 0, width, height);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(45.0, (double)width / (double)height, 5.0, 200.0);
+	g_dancescene.Reshape( width, height );
 }
 
 void idle()
@@ -224,12 +179,12 @@ void idle()
 	glutPostRedisplay();
 }
 
-void gluiCallbackExit(int num)
+void gluiCallbackExit( int num )
 {
 	exit(0);
 }
 
-void gluiCallbackReset(int num)
+void gluiCallbackReset( int num )
 {
 	g_view_rot->reset();
 	g_view_transXY->set_x( 0.0f );

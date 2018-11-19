@@ -424,11 +424,13 @@ void NUT::ExportDDS()
 			}
 		}
 
-		char str[200];
-		sprintf(str, "%X.dds", texture_data[i].GIDX);
+		char str[30];
+		sprintf_s(str, sizeof(str), "%X.dds", texture_data[i].GIDX);
 
-		FILE* fp = fopen(str, "wb");
-		fwrite(&dds_data[0], dds_data.size(), 1, fp);
+		FILE* fp;
+		errno_t err = fopen_s(&fp, str, "wb");
+		if( err ) return;
+		fwrite( &dds_data[0], dds_data.size(), 1, fp);
 		fclose( fp );
 	}
 }
