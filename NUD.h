@@ -434,7 +434,7 @@ struct Mesh
 	int unknown2;
 	int unknown3;
 
-	int no_edge_flag;
+	int unknown_flag;
 
 	std::vector<Texture> texture;
 
@@ -481,7 +481,7 @@ struct Mesh
 		unknown2 = pFile->ReadInt16();		// always 0
 		unknown3 = pFile->ReadInt16();		// always 0
 
-		no_edge_flag = pFile->ReadInt16();
+		unknown_flag = pFile->ReadInt16();
 
 		// read texture
 		texture.resize( nTexture );
@@ -507,7 +507,7 @@ struct Mesh
 		pFile->WriteUInt16( unknown2 );
 		pFile->WriteUInt16( unknown3 );
 
-		pFile->WriteInt16( no_edge_flag );
+		pFile->WriteInt16( unknown_flag );
 
 		for(int i=0; i< texture.size(); i++)
 		{

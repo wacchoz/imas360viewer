@@ -1,0 +1,38 @@
+// ToonVertex
+
+float4 	g_Diffuse		= {1.0f, 1.0f, 1.0f, 1.0f};	// Diffuse color of the material
+float3 g_dirKeyLight	= { 0.523f,  0.454f,  0.721f};
+float3 g_dirHighLight	= { 0.275f,  0.454f, -0.847f};
+float3 g_dirBloom		= { 0.000f,  0.707f, -0.707f};
+
+void mainVS(
+	float4 position : POSITION,
+	float3 normal : NORMAL,
+	float2 texCoord : TEXCOORD0,
+
+	out float4 outPos : POSITION,
+	out float2 outTexCoord : TEXCOORD0,
+	out float3 outNormal : TEXCOORD1,
+
+	out float4 outDiffuse1 : TEXCOORD2,
+	out float4 outDiffuse2 : TEXCOORD3,
+	out float4 outDiffuse3 : TEXCOORD4,
+
+	uniform float4x4 ModelViewProj,
+	uniform float4x4 ModelView
+	)
+{
+	outPos = mul(ModelViewProj, position);
+
+	outNormal = mul((float3x3)ModelView, normal);
+
+	outTexCoord = texCoord;
+
+    float3 	lightInView1 = mul( (float3x3)ModelView, g_dirKeyLight);
+    float3 	lightInView2= mul( (float3x3)ModelView, g_dirHighLight);
+    float3 	lightInView3= mul( (float3x3)ModelView, g_dirBloom);
+
+    outDiffuse1 = float4( saturate( dot( outNormal, normalize( lightInView1 ) ) ) * g_Diffuse.xyz , g_Diffuse.w);
+    outDiffuse2 = float4( saturate( dot( outNormal, normalize( lightInView2 ) ) ) * g_Diffuse.xyz , g_Diffuse.w);
+    outDiffuse3 = float4( saturate( dot( outNormal, normalize( lightInView3 ) ) ) * g_Diffuse.xyz , g_Diffuse.w);
+}

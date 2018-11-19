@@ -284,8 +284,154 @@ public:
 		out.WriteToFile();
 	}
 
+	void ExportDDS();
+
 };
 
+
+struct DDS_HEADER
+{
+	int dwMagic;		// 'DDS '
+
+	int dwSize;			// 構造体のサイズ。常に124
+	int dwFlags;		// 有効なフィールドを示すフラグ
+	int dwHeight;		// イメージの高さ
+	int dwWidth;		// イメージの幅
+	int dwPitchOrLinearSize;		// 圧縮フォーマットの場合はイメージの総バイト数
+	int dwDepth;
+	int dwMipMapCount;
+	int dwReserved1[11];
+
+	struct DDPIXELFORMAT
+	{
+		int dwSize;
+		int dwFlags;
+		int dwFourCC;
+		int dwRGBBitCount;
+		int dwRBitMask;
+		int dwGBitMask;
+		int dwBBitMask;
+		int dwRGBAlphaBitMask;
+	} ddpfPixelFormat;
+
+	struct DDCAPS2
+	{
+		int dwCaps1;
+		int dwCaps2;
+		int Reserved[2];
+	} ddsCaps;
+
+	int dwReserved2;
+};
+
+void NUT::ExportDDS()
+{
+	for(int i=0; i< texture_data.size(); i++)
+	{
+		DDS_HEADER header;
+
+		header.dwMagic = ' SDD';
+		header.dwSize = 124;
+		header.dwFlags = 0x000A1007;
+		header.dwHeight = texture_data[i].height;
+		header.dwWidth = texture_data[i].width;
+		header.dwPitchOrLinearSize = 0;
+		header.dwDepth = 0;
+		header.dwMipMapCount = texture_data[i].nMipmap;
+		header.dwReserved1[0] = 0;
+		header.dwReserved1[1] = 0;
+		header.dwReserved1[2] = 0;
+		header.dwReserved1[3] = 0;
+		header.dwReserved1[4] = 0;
+		header.dwReserved1[5] = 0;
+		header.dwReserved1[6] = 0;
+		header.dwReserved1[7] = 0;
+		header.dwReserved1[8] = 0;
+		header.dwReserved1[9] = 0;
+		header.dwReserved1[10] = 0;
+		header.dwReserved1[11] = 0;
+
+		header.ddpfPixelFormat.dwSize = 32;
+		header.ddpfPixelFormat.dwFlags = 0x000004;
+
+		header.ddpfPixelFormat.dwRGBBitCount = 0;
+		header.ddpfPixelFormat.dwRBitMask = 0;
+		header.ddpfPixelFormat.dwGBitMask = 0;
+		header.ddpfPixelFormat.dwBBitMask = 0;
+		header.ddpfPixelFormat.dwRGBAlphaBitMask = 0;
+
+		switch(texture_data[i].pixel_type){
+			case 0:
+				header.ddpfPixelFormat.dwFourCC = '1TXD';
+				break;
+			case 1:
+				header.ddpfPixelFormat.dwFourCC = '3TXD';
+				break;
+			case 2:
+				header.ddpfPixelFormat.dwFourCC = '5TXD';
+				break;
+			case 19:
+				// RGB32
+			case 20:
+				// ARGB32
+				header.dwFlags = 0x0002100F;
+				header.ddpfPixelFormat.dwFlags = 0x00000041;
+				header.ddpfPixelFormat.dwFourCC = 0;
+
+				header.ddpfPixelFormat.dwRGBBitCount = 32;
+				header.ddpfPixelFormat.dwRBitMask = 0x00FF0000;
+				header.ddpfPixelFormat.dwGBitMask = 0x0000FF00;
+				header.ddpfPixelFormat.dwBBitMask = 0x000000FF;
+				header.ddpfPixelFormat.dwRGBAlphaBitMask = 0xFF000000;
+		}
+
+
+		header.ddsCaps.dwCaps1 = 0x00401008;
+		header.ddsCaps.dwCaps2 = 0;
+		header.ddsCaps.Reserved[0] = 0;
+		header.ddsCaps.Reserved[1] = 0;
+
+		header.dwReserved2 = 0;
+
+		std::vector< unsigned char > dds_data;
+
+		dds_data.resize( sizeof(header) + texture_data[i].raw_texture.size() );
+		memcpy(&dds_data[0], &header, sizeof(header));
+		memcpy(&dds_data[0]+sizeof(header), &texture_data[i].raw_texture[0], texture_data[i].raw_texture.size());
+
+		int pixel_type = texture_data[i].pixel_type;
+		if( pixel_type == 0 || pixel_type==1 || pixel_type==2)
+		{
+			int tmp;
+			for(int k=sizeof(header); k< sizeof(header) + texture_data[i].raw_texture.size(); k+=2)
+			{
+				tmp = dds_data[k];
+				dds_data[k] =dds_data[k+1];
+				dds_data[k+1]=tmp;
+			}
+		}else
+		{
+			int tmp;
+			for(int k=sizeof(header); k< sizeof(header) + texture_data[i].raw_texture.size(); k+=4)
+			{
+				tmp = dds_data[k];
+				dds_data[k] =dds_data[k+3];
+				dds_data[k+3]=tmp;
+
+				tmp = dds_data[k+1];
+				dds_data[k+1] =dds_data[k+2];
+				dds_data[k+2]=tmp;
+			}
+		}
+
+		char str[200];
+		sprintf(str, "%X.dds", texture_data[i].GIDX);
+
+		FILE* fp = fopen(str, "wb");
+		fwrite(&dds_data[0], dds_data.size(), 1, fp);
+		fclose( fp );
+	}
+}
 
 };	// namespace imas
 
