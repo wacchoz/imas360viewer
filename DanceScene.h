@@ -38,12 +38,15 @@ private:
 
 	imas::CameraMotion m_camera_motion;
 
-	BitmapFont m_FontLyrics;	// 日本語フォント
+	BitmapFont m_FontLyrics;	// 歌詞用フォント
+	BitmapFont m_FontTitle;		// タイトルetc用フォント
 	BitmapFont m_FontInfo;		// Debug用フォント
 
 	int m_window_width;
 	int m_window_height;
-//	bool m_bImasCamera;			// im@s camera or User camera
+
+public:
+	enum DISPLAY_MODE{ MESH=0, WIREFRAME=1, SKELETON=2};
 
 private:
 	struct debugInfo{
@@ -64,11 +67,13 @@ public:
 		std::string song;
 		std::string dancefile;
 		std::string songfile;
-	};
+	} m_input;
 
 public:
 	bool Init(Input& input )
 	{
+		m_input = input;
+
 		imas::InitializeGameConstant();
 
 		// キャラクター読み込み
@@ -175,25 +180,24 @@ public:
 			m_OutlineShader.Init();
 		}
 
-		// フォント
-		if(		! m_FontLyrics.CreateW(L"ＭＳ　Ｐゴシック", 24)
-			||	! m_FontInfo.CreateA("Arial", 24) )
-		{
+		// Font
+		if(	! m_FontInfo.CreateA("Arial", 24) )
 			std::cout << "Error at creating font" << endl;
-		}
+
 
 		return true;
 	}
 
 
-	void Update( int frame )
+	void Update( float frame, int bEnablePhysics)
 	{
 		const int start_dance = m_dance_script.start.start_dance;
+		const int wait = m_dance_script.start.wait;
 
-		float currentBeat = (frame - m_dance_script.start.wait ) / 360.0f * m_BPM - m_scriptDelay;
+		float currentBeat = (frame - wait ) / 360.0f * m_BPM - m_scriptDelay;
 
 		// 音楽
-		if( frame >= m_dance_script.start.wait )
+		if( frame >= wait )
 		{
 			static bool first = true;
 			if(first)
@@ -211,8 +215,9 @@ public:
 		std::string face_type;
 		std::string face_type_previous;
 		int change_face_beat=0;
+		bool bForce_mouth;		// 強制リップシンク
 
-		m_dance_script.GetFace( currentBeat, face_type, face_type_previous, change_face_beat);
+		m_dance_script.GetFace( currentBeat, face_type, face_type_previous, change_face_beat, bForce_mouth);
 
 		for( int i=0; i<3; i++)
 		{
@@ -220,7 +225,6 @@ public:
 			int face_id_previous;
 
 			// 表情を検索
-			int a = imas::g_chara2mpkID[ m_character[i].GetName() ];
 			face_id = m_dance_script.GetFaceID( face_type, imas::g_chara2mpkID[ m_character[i].GetName() ] );
 			// 前の表情を検索
 			face_id_previous = m_dance_script.GetFaceID( face_type_previous, imas::g_chara2mpkID[ m_character[i].GetName() ] );
@@ -231,45 +235,75 @@ public:
 
 			/////////////////////////////////////////////
 			// メッシュ変更本体
-			if( frame < m_dance_script.start.wait + start_dance )		// loop motion
+			if( frame <= wait + start_dance )					// loop motion
 			{
-				if( frame < m_dance_script.start.wait + start_dance - 10 )
+				if( frame < wait + start_dance - 10 )
 				{
-					m_character[i].UpdateBody( m_loopMotion[i].GetPose( frame % m_loopMotion[i].GetSize() ));
+					m_character[i].UpdateBody( m_loopMotion[i].GetPose( ((int)frame) % m_loopMotion[i].GetSize() ));
 				}
 				else		// loopとdanceを10frameでつなぐ
 				{
-					imas::Pose lerppose, loop_pose, first_pose;
-					loop_pose = m_loopMotion[i].GetPose( frame % m_loopMotion[i].GetSize() );
-					first_pose = m_motion[i].GetPose( 0 );
-					lerppose = imas::PoseLerp( loop_pose, first_pose, (float) (frame - (m_dance_script.start.wait + start_dance - 10)) / 10.0f );
+					imas::BodyPose lerppose, loop_pose, first_pose;
+					loop_pose = m_loopMotion[i].GetPose( ((int)frame) % m_loopMotion[i].GetSize() );
+					first_pose = m_motion[i].GetPose( 1 );	// 1にしないと"oha.bna"でバグる
+					lerppose = imas::PoseLerp( loop_pose, first_pose, (frame - (wait + start_dance - 10)) / 10.0f );
 					m_character[i].UpdateBody( lerppose );
 				}
 			}
-			else														// dance motion
+			else												// dance motion
 			{
-				m_character[i].UpdateBody( m_motion[i].GetPose(frame - m_dance_script.start.wait - start_dance) );
+				m_character[i].UpdateBody( m_motion[i].GetPose( frame - wait - start_dance ) );
 			}
 
 			// センターだけリップシンクする
-			if( i== 0 )
-				m_character[i].UpdateLip( m_lipmotion.GetPose(frame - m_dance_script.start.wait ) );
+			if( i== 0 || bForce_mouth )
+				m_character[i].UpdateLip( m_lipmotion.GetPose( frame - wait ) );
 			else
 				m_character[i].CloseLip();
+		}
 
+		// 物理演算の初期化（初回のみ、ゼロフレーム姿勢で初期化）
+		static bool init_physics = false;
+		if( ! init_physics )
+		{
+			for(int i=0; i<3; i++)
+			{
+				m_character[i].InitPhysics();
+			}
+			init_physics = true;
+		}
+
+		if( bEnablePhysics )
+		{
+			// 物理演算本体
+			for( int i=0; i<3; i++)
+			{
+				m_character[i].ApplyPhysics( frame );
+			}
+		}else
+		{
+			for( int i=0; i<3; i++ )
+			{
+				m_character[i].DisablePhysics();
+			}
+		}
+
+		// メッシュ更新
+		for( int i=0; i<3; i++)
+		{
 			m_character[i].UpdateSkinningMatrix();
 			m_character[i].UpdateMesh();
 		}
 
 		// Camera姿勢を更新
-		m_camera_motion.Update( frame - m_dance_script.start.wait );	// lipと同じkey
+		m_camera_motion.Update( frame - wait );	// lipと同じkey
 
 
 		// Debug用情報
 		{
 			debugInfo.frame = frame;
 			debugInfo.currentBeat = currentBeat;
-			debugInfo.face_type = face_type;
+			debugInfo.face_type = face_type + ( bForce_mouth ? "/all_open" : "");
 			debugInfo.m_dance_script_start_wait = m_dance_script.start.wait; 
 			debugInfo.m_dance_script_start_start_dance = m_dance_script.start.start_dance;
 
@@ -282,7 +316,7 @@ public:
 		}
 	}
 
-	void Display(float* rotate, float* trans_XY, float* trans_Z, int bWireframe, int bShowInfo, int bImasCamera)
+	void Display(float* rotate, float* trans_XY, float* trans_Z, DISPLAY_MODE display_mode, int bShowRig, int bShowInfo, int bImasCamera)
 	{
 		// 背景のクリア
 		glClearColor( 0.5f, 0.5f, 1.0f, 1.0f );
@@ -300,33 +334,51 @@ public:
 			gluPerspective( 30.0, (double)m_window_width / (double)m_window_height, 5.0, 200.0 );
 			gluLookAt( 0.0f, 10.0f, 40.0f, 0.0f, 10.0f, 0.0f, 0.0f, 1.0f, 0.0f );
 
+			// GLUI camera
 			glMatrixMode( GL_MODELVIEW );
 			glLoadIdentity();
-			glTranslatef( trans_XY[0], trans_XY[1], trans_Z[0] );	//平行移動
-			glMultMatrixf( rotate );	// 回転
+			glTranslatef( trans_XY[0], trans_XY[1], trans_Z[0] );
+			glMultMatrixf( rotate );
 		}
 
-		
-		// ワイヤフレーム切り替え
-		if( bWireframe )
+
+		switch( display_mode )
 		{
+		case MESH:
+			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+			for(int i=0; i<3; i++)
+			{
+				m_character[i].Render( & m_ToonShader, imas::Character::RENDER_MESH );
+				m_character[i].Render( & m_OutlineShader,  imas::Character::RENDER_OUTLINE );
+			}
+			break;
+
+		case WIREFRAME:
 			glLineWidth(1.0f);
 			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-
 			for(int i=0; i<3; i++)
 			{
 				m_character[i].Render( & m_ToonShader, imas::Character::RENDER_LINE );
 			}
-//			m_character.m_Skeleton.Render();
-		}
-		else
-		{
-			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+			break;
 
+		case SKELETON:
+			glLineWidth(1.0f);
+			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 			for(int i=0; i<3; i++)
 			{
-				m_character[i].Render( & m_OutlineShader,  imas::Character::RENDER_OUTLINE );
-				m_character[i].Render( & m_ToonShader, imas::Character::RENDER_MESH );
+				m_character[i].m_Skeleton.Render();
+			}
+			break;
+		}
+
+		if( bShowRig )
+		{
+			glLineWidth(1.0f);
+			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+			for(int i=0; i<3; i++)
+			{
+				m_character[i].m_Skeleton.RenderRig();
 			}
 		}
 		
@@ -353,7 +405,7 @@ public:
 		glEnd();
 
 
-		// FPS表示
+		// FPS計算
 		{
 			static int frame = 0;
 			static int last_t;
@@ -377,43 +429,55 @@ public:
 				glPushMatrix();
 
 					glLoadIdentity();
-					gluOrtho2D(0, 720/4, 0, 720/4);	// ちょっとインチキ
-					//ここから描画
+					gluOrtho2D(0, 1080, 0, 720);
+
 					glPushAttrib(GL_CURRENT_BIT|GL_DEPTH_BUFFER_BIT);  // 色、Zバッファの退避
 					glDisable(GL_DEPTH_TEST);
 					glColor3d(1,1,1);
 
+					// 日本語歌詞
+					glRasterPos2i(540 - debugInfo.lyrics.length() * m_FontLyrics.m_size / 2, 40);
+					m_FontLyrics.DrawStringW( (wchar_t*) debugInfo.lyrics.c_str() );
+
+					// タイトル等
+					glRasterPos2i(20, 60);
+					m_FontTitle.DrawStringW( (wchar_t*) std::wstring( L"# " + imas::g_songName[ m_input.song ] ).c_str() );
+					glRasterPos2i(20, 40);
+					m_FontTitle.DrawStringW( (wchar_t*) 
+						std::wstring( imas::g_charaName[ m_character[0].charaName ] + L"/" + imas::g_charaName[ m_character[1].charaName ] + L"/" + imas::g_charaName[ m_character[2].charaName ] ).c_str() );
+					glRasterPos2i(20, 20);
+					m_FontTitle.DrawStringW( (wchar_t*) L"765Production" );
+
+
+					glColor3d( 0.7, 0.7, 1.0 );
+					// Info
 					sprintf_s(buf,sizeof(buf),  "fps : %4.1f", debugInfo.fps); 
-					glRasterPos2i(10, 5);
+					glRasterPos2i(20, 120);
 					m_FontInfo.DrawStringA(buf);
 
 					sprintf_s(buf, sizeof(buf), "frame : %4d", debugInfo.frame); 
-					glRasterPos2i(10, 10);
+					glRasterPos2i(20, 140);
 					m_FontInfo.DrawStringA(buf);
 
 					sprintf_s(buf, sizeof(buf), "beat  :  %4.1f", debugInfo.currentBeat); 
-					glRasterPos2i(10, 15);
+					glRasterPos2i(20, 160);
 					m_FontInfo.DrawStringA(buf);
 
 					sprintf_s(buf, sizeof(buf), "face  : %s", debugInfo.face_type.c_str()); 
-					glRasterPos2i(10, 20);
+					glRasterPos2i(20, 180);
 					m_FontInfo.DrawStringA(buf);
 
 					sprintf_s(buf, sizeof(buf), "wait  : %d", debugInfo.m_dance_script_start_wait); 
-					glRasterPos2i(10, 25);
+					glRasterPos2i(20, 200);
 					m_FontInfo.DrawStringA(buf);
 
 					sprintf_s(buf,sizeof(buf),  "start : %d", debugInfo.m_dance_script_start_start_dance); 
-					glRasterPos2i(10, 30);
+					glRasterPos2i(20, 220);
 					m_FontInfo.DrawStringA(buf);
 
 					sprintf_s(buf,sizeof(buf),  "part : %s", debugInfo.part.c_str()); 
-					glRasterPos2i(10, 35);
+					glRasterPos2i(20, 240);
 					m_FontInfo.DrawStringA(buf);
-
-					// 日本語用
-					glRasterPos2i(50, 10);
-					m_FontLyrics.DrawStringW( (wchar_t*) debugInfo.lyrics.c_str() );
 
 					glPopAttrib();
 				
@@ -435,6 +499,19 @@ public:
 		glMatrixMode( GL_PROJECTION );
 		glLoadIdentity();
 		gluPerspective( 30.0, (double)width / (double)height, 5.0, 200.0 );
+
+		// フォント
+		m_FontLyrics.ReleaseW();
+//		m_FontInfo.ReleaseA();
+		m_FontTitle.ReleaseW();
+		if(	! m_FontLyrics.CreateW(L"ＭＳ　Ｐゴシック", height / 30) )
+			std::cout << "Error at creating font" << endl;
+
+//		if(	! m_FontInfo.CreateA("Arial", height / 40) )
+//			std::cout << "Error at creating font" << endl;
+
+		if( ! m_FontTitle.CreateW(L"HG丸ｺﾞｼｯｸM-PRO", height / 40) )
+			std::cout << "Error at creating font" << endl;
 	}
 };
 

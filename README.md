@@ -10,7 +10,7 @@ Dance stage viewer of "THE IDOLM@STER"(Xbox360) and "THE IDOLM@STER LIVE FOR YOU
 This software is the dance stage viewer "THE IDOLM@STER"(Xbox360) and "THE IDOLM@STER LIVE FOR YOU!"(Xbox360). 
 
 - Rendering character 3D model
-- dance motion,
+- dance motion with physics simulation
 - lip-synch
 - Facial expression
 - play song and music
@@ -56,6 +56,11 @@ and music file in aix section.
 
 
 # Demo
+
+## Release 1.1
+
+- Physics simulation
+<img src="./image/mas_phys.png" height=400>
 
 ## Release 1.0
 

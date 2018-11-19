@@ -59,11 +59,11 @@ public:
 struct CHAIN_JOINT_DATA
 {
 	int	bone_ID;
-	float unknown0;
+	float unknown0;		// unknown0-2: gravity ?
 	float unknown1;
 	float unknown2;
-	float damping;
-	float spring;
+	float damping;		// damping of velocity
+	float spring;		// degree of returning to the original position
 	float radius;
 
 public:
@@ -160,9 +160,7 @@ public:
 struct BoundingSphere
 {
 	int bone_ID;
-	float posX;
-	float posY;
-	float posZ;
+	D3DXVECTOR3 pos;
 	float radius;
 
 public:
@@ -170,9 +168,9 @@ public:
 	{
 		bone_ID = pFile->ReadUInt32();
 
-		posX = pFile->ReadSingle();
-		posY = pFile->ReadSingle();
-		posZ = pFile->ReadSingle();
+		pos.x = pFile->ReadSingle();
+		pos.y = pFile->ReadSingle();
+		pos.z = pFile->ReadSingle();
 		radius = pFile->ReadSingle();
 
 		return true;
@@ -182,9 +180,9 @@ public:
 	{
 		pFile->WriteUInt32( bone_ID );
 
-		pFile->WriteSingle( posX );
-		pFile->WriteSingle( posY );
-		pFile->WriteSingle( posZ );
+		pFile->WriteSingle( pos.x );
+		pFile->WriteSingle( pos.y );
+		pFile->WriteSingle( pos.z );
 		pFile->WriteSingle( radius );
 	}
 
@@ -197,10 +195,10 @@ public:
 struct BoundingCylinder
 {
 	int ID1;
-	float posX1, posY1, posZ1;
+	D3DXVECTOR3 pos1;
 	float radius1;
 	int ID2;
-	float posX2, posY2, posZ2;
+	D3DXVECTOR3 pos2;
 	float radius2;
 
 public:
@@ -208,16 +206,16 @@ public:
 	{
 		ID1 = pFile->ReadUInt32();
 
-		posX1 = pFile->ReadSingle();
-		posY1 = pFile->ReadSingle();
-		posZ1 = pFile->ReadSingle();
+		pos1.x = pFile->ReadSingle();
+		pos1.y = pFile->ReadSingle();
+		pos1.z = pFile->ReadSingle();
 		radius1 = pFile->ReadSingle();
 
 		ID2 = pFile->ReadUInt32();
 		
-		posX2 = pFile->ReadSingle();
-		posY2 = pFile->ReadSingle();
-		posZ2 = pFile->ReadSingle();
+		pos2.x = pFile->ReadSingle();
+		pos2.y = pFile->ReadSingle();
+		pos2.z = pFile->ReadSingle();
 		radius2 = pFile->ReadSingle();
 
 		return true;
@@ -226,15 +224,15 @@ public:
 	void Write( File* pFile)
 	{
 		pFile->WriteUInt32( ID1 );
-		pFile->WriteSingle( posX1 );
-		pFile->WriteSingle( posY1 );
-		pFile->WriteSingle( posZ1 );
+		pFile->WriteSingle( pos1.x );
+		pFile->WriteSingle( pos1.y );
+		pFile->WriteSingle( pos1.z );
 		pFile->WriteSingle( radius1 );
 
 		pFile->WriteUInt32( ID2 );
-		pFile->WriteSingle( posX2 );
-		pFile->WriteSingle( posY2 );
-		pFile->WriteSingle( posZ2 );
+		pFile->WriteSingle( pos2.x );
+		pFile->WriteSingle( pos2.y );
+		pFile->WriteSingle( pos2.z );
 		pFile->WriteSingle( radius2 );
 	}
 
@@ -460,7 +458,7 @@ public:
 
 		yur2.Write( & file );
 
-		// rig_table_size‚ğ‘‚«o‚µ
+		// write rig_table_size
 		file.Rewind();
 		file.Skip( 12 );
 		file.WriteUInt32( yur2.WriteSize() );

@@ -124,7 +124,7 @@ public:
 
 	bool LoadFacialPoseArray( std::string staticmot_file )
 	{
-		if( ! m_facialArray.Load( staticmot_file, charaName) ) return false;
+		if( ! m_facialArray.Load( staticmot_file, charaName ) ) return false;
 		m_Skeleton.AttachFacialPoseArray( & m_facialArray );
 		return true;
 	}
@@ -144,7 +144,7 @@ public:
 		m_Skeleton.UpdateFaceEmotionLERP( faceID1, faceID2, t );
 	}
 
-	void UpdateBody( Pose& body_pose )
+	void UpdateBody( BodyPose& body_pose )
 	{
 		m_Skeleton.UpdateBody( body_pose );
 	}
@@ -159,9 +159,31 @@ public:
 		m_Skeleton.CloseLip();
 	}
 
+	void OpenLip()
+	{
+		m_Skeleton.OpenLip();
+	}
+
 	void UpdateSkinningMatrix()
 	{
 		m_Skeleton.UpdateSkinningMatrix();
+	}
+
+	void InitPhysics()
+	{
+		m_Skeleton.CalculateWorldMatrix();	// 初期のボーンの座標を１回計算する
+		m_Skeleton.InitPhysics();
+	}
+
+	void DisablePhysics()
+	{
+		m_Skeleton.DisablePhysics();
+	}
+
+	void ApplyPhysics( float frame )
+	{
+		m_Skeleton.CalculateWorldMatrix();	// ボーンアニメーションでの位置変更を計算
+		m_Skeleton.ApplyPhysics( frame );
 	}
 
 	void UpdateMesh()
@@ -247,6 +269,19 @@ public:
 					}
 					cgGLEnableTextureParameter( pShader->parameter["diffuseSampler"] );
 					cgGLEnableTextureParameter( pShader->parameter["specularSampler"] );
+				}
+
+				// 輪郭用
+				if( typeid( *pShader) == typeid( OutlineShader ) )
+				{
+					switch( (*s).render_flag )
+					{
+//					case 0x10210001:
+//					case 0x10210011:
+//						continue;
+					case 0x10210021:
+						if((*s).unknown_flag == 1 ) continue;
+					}
 				}
 
 				// 描画本体

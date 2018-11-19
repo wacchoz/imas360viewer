@@ -24,7 +24,7 @@ class CameraMotion
 {
 private:
 	std::vector< CameraPose > camera_pose;
-	int m_current_key;
+	float m_current_key;
 
 public:
 
@@ -69,24 +69,32 @@ public:
 		return  Load( & bna );
 	}
 
-	void Update( int key )
+	void Update( float key )
 	{
 		m_current_key = key;
 	}
 
-	void ApplyCamera( int key, double aspectRatio )
+	void ApplyCamera( float key, double aspectRatio )
 	{
 		if( key < 0 ) key = 0;
 		if( key >= camera_pose.size() ) key = camera_pose.size() - 1;
 
+		float fraction = key - (int) key;
+		CameraPose camerapose;
+
+		camerapose.fov = (1 - fraction) * camera_pose[(int)key].fov + fraction * camera_pose[(int)key+1].fov;
+		camerapose.eye = (1 - fraction) * camera_pose[(int)key].eye + fraction * camera_pose[(int)key+1].eye;
+		camerapose.target = (1 - fraction) * camera_pose[(int)key].target + fraction * camera_pose[(int)key+1].target;
+		camerapose.up = (1 - fraction) * camera_pose[(int)key].up + fraction * camera_pose[(int)key+1].up;
+
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		gluPerspective( camera_pose[key].fov * 180.0f / D3DX_PI, aspectRatio, 5.0, 200.0);
+		gluPerspective( camerapose.fov * 180.0f / D3DX_PI, aspectRatio, 5.0, 200.0);
 		glMatrixMode( GL_MODELVIEW );
 		glLoadIdentity();
-		gluLookAt(	camera_pose[key].eye.x, camera_pose[key].eye.y, camera_pose[key].eye.z,
-					camera_pose[key].target.x, camera_pose[key].target.y, camera_pose[key].target.z,
-					camera_pose[key].up.x, camera_pose[key].up.y, camera_pose[key].up.z);
+		gluLookAt(	camerapose.eye.x, camerapose.eye.y, camerapose.eye.z,
+					camerapose.target.x, camerapose.target.y, camerapose.target.z,
+					camerapose.up.x, camerapose.up.y, camerapose.up.z);
 	}
 
 	void ApplyCamera( float aspectRatio )

@@ -15,35 +15,60 @@ namespace imas
 
 struct JointPose	// やや冗長だが…
 {
-	float posX, posY, posZ;
-	float rotX, rotY, rotZ;
-	float scaleX, scaleY, scaleZ;
+	D3DXVECTOR3 translate;
+	D3DXVECTOR3 rot;		// こっちは参考用。スキニングに直接は使わない
+	D3DXVECTOR3 scale;
+
+	D3DXQUATERNION q;		// 回転はquaternionを正とする
+
+	JointPose() : translate(D3DXVECTOR3(0.0f,0.0f,0.0f)), rot(D3DXVECTOR3(0.0f,0.0f,0.0f)),
+					scale(D3DXVECTOR3(1.0f,1.0f,1.0f)), q(D3DXQUATERNION(0.0f,0.0f,0.0f,1.0f)){};
+
+	void CalcQuaternion()
+	{
+		D3DXMATRIX rotX_mat, rotY_mat, rotZ_mat, tmp_M;
+		D3DXMatrixRotationX(&rotX_mat, rot.x);
+		D3DXMatrixRotationY(&rotY_mat, rot.y);
+		D3DXMatrixRotationZ(&rotZ_mat, rot.z);
+
+		tmp_M = rotX_mat * rotY_mat * rotZ_mat;
+
+		D3DXQuaternionRotationMatrix( &q, &tmp_M);
+	}
 };
 
 
 // Body用
-struct Pose
+struct BodyPose
 {
 	D3DXVECTOR3 position;	// 腰の位置
-	std::vector< JointPose > joint_pose;	// rot*のみ使用
+	std::vector< JointPose > joint_pose;	// 回転のみ使用
 };
+
+// Body Poseのlerp用
+BodyPose PoseLerp(BodyPose& pose1, BodyPose& pose2, float t);
 
 
 class Motion
 {
 public:
-	std::vector< Pose > body_pose;
+	std::vector< BodyPose > body_pose;
 
 public:
 	enum POSITION { CENTER, RIGHT, LEFT};
 	enum MOTIONTYPE { MAIN, LOOP};
 
 public:
-	Pose& GetPose( int key )
+	BodyPose GetPose( float key )
 	{
 		if( key < 0 ) return body_pose[ 0 ];
-		if( key >= body_pose.size() ) return body_pose[ body_pose.size() - 1 ];
-		return body_pose[ key ];
+		if( key >= body_pose.size() - 1 ) return body_pose[ body_pose.size() - 1 ];
+		
+		float fraction = key - (int) key;
+
+		BodyPose result = PoseLerp( body_pose[ (int) key ], body_pose[ (int) key+1 ], fraction );
+		
+		return result;
 	}
 
 	int GetSize()
@@ -186,24 +211,33 @@ public:
 			body_pose[key].position.z = numBody.key[key].ch[2].data3 / 1000.0f * 2.0f;
 
 			// body
-			for(int i=3; i<numBody.key[key].ch.size(); i++){
-				body_pose[key].joint_pose[i-1].rotX = numBody.key[key].ch[i].data1 / 32768.0f * D3DX_PI;
-				body_pose[key].joint_pose[i-1].rotY = numBody.key[key].ch[i].data2 / 32768.0f * D3DX_PI;
-				body_pose[key].joint_pose[i-1].rotZ = numBody.key[key].ch[i].data3 / 32768.0f * D3DX_PI;
+			for(int i=3; i<numBody.key[key].ch.size(); i++)
+			{
+				body_pose[key].joint_pose[i-1].rot.x = numBody.key[key].ch[i].data1 / 32768.0f * D3DX_PI;
+				body_pose[key].joint_pose[i-1].rot.y = numBody.key[key].ch[i].data2 / 32768.0f * D3DX_PI;
+				body_pose[key].joint_pose[i-1].rot.z = numBody.key[key].ch[i].data3 / 32768.0f * D3DX_PI;
+
+				body_pose[key].joint_pose[i-1].CalcQuaternion();
 			}
 
 			// R hand
-			for(int i=0; i<numHandL.key[key].ch.size(); i++){
-				body_pose[key].joint_pose[i+24].rotX = numHandR.key[key].ch[i].data1 / 32768.0f * D3DX_PI;
-				body_pose[key].joint_pose[i+24].rotY = numHandR.key[key].ch[i].data2 / 32768.0f * D3DX_PI;
-				body_pose[key].joint_pose[i+24].rotZ = numHandR.key[key].ch[i].data3 / 32768.0f * D3DX_PI;
+			for(int i=0; i<numHandL.key[key].ch.size(); i++)
+			{
+				body_pose[key].joint_pose[i+24].rot.x = numHandR.key[key].ch[i].data1 / 32768.0f * D3DX_PI;
+				body_pose[key].joint_pose[i+24].rot.y = numHandR.key[key].ch[i].data2 / 32768.0f * D3DX_PI;
+				body_pose[key].joint_pose[i+24].rot.z = numHandR.key[key].ch[i].data3 / 32768.0f * D3DX_PI;
+
+				body_pose[key].joint_pose[i+24].CalcQuaternion();
 			}
 
 			// L hand
-			for(int i=0; i<numHandR.key[key].ch.size(); i++){
-				body_pose[key].joint_pose[i+39].rotX = numHandL.key[key].ch[i].data1 / 32768.0f * D3DX_PI;
-				body_pose[key].joint_pose[i+39].rotY = numHandL.key[key].ch[i].data2 / 32768.0f * D3DX_PI;
-				body_pose[key].joint_pose[i+39].rotZ = numHandL.key[key].ch[i].data3 / 32768.0f * D3DX_PI;
+			for(int i=0; i<numHandR.key[key].ch.size(); i++)
+			{
+				body_pose[key].joint_pose[i+39].rot.x = numHandL.key[key].ch[i].data1 / 32768.0f * D3DX_PI;
+				body_pose[key].joint_pose[i+39].rot.y = numHandL.key[key].ch[i].data2 / 32768.0f * D3DX_PI;
+				body_pose[key].joint_pose[i+39].rot.z = numHandL.key[key].ch[i].data3 / 32768.0f * D3DX_PI;
+
+				body_pose[key].joint_pose[i+39].CalcQuaternion();
 			}
 		}
 		return true;
@@ -224,7 +258,7 @@ public:
 // リップシンク
 struct LipPose
 {
-	float x, y;	// 口の動きを表す内部表現
+	D3DXVECTOR2 v;	// 口の動きを表す内部表現
 };
 
 // リップシンク
@@ -234,11 +268,15 @@ private:
 	std::vector<LipPose> lip_pose;
 
 public:
-	LipPose& GetPose( int key )
+	LipPose GetPose( float key )
 	{
 		if( key < 0 ) return lip_pose[ 0 ];
-		if( key >= lip_pose.size() ) return lip_pose[ lip_pose.size() - 1 ];
-		return lip_pose[ key ];
+		if( key  >= lip_pose.size() - 1 ) return lip_pose[ lip_pose.size() - 1 ];
+
+		float fraction = key - (int) key;
+		LipPose result;
+		result.v = (1-fraction) * lip_pose[ (int)key ].v + fraction * lip_pose[ (int)key+1 ].v;
+		return result;
 	}
 
 	bool Load( BNAFile* pBNAFile )
@@ -254,8 +292,8 @@ public:
 		lip_pose.resize( numLip.key.size() );
 		for( int key = 0; key < numLip.key.size(); key++)
 		{
-			lip_pose[key].x = numLip.key[key].ch[0].data1 / 16384.0f;
-			lip_pose[key].y = numLip.key[key].ch[0].data3 / 16384.0f;
+			lip_pose[key].v.x = numLip.key[key].ch[0].data1 / 16384.0f;
+			lip_pose[key].v.y = numLip.key[key].ch[0].data3 / 16384.0f;
 		}
 
 		return true;
@@ -275,7 +313,7 @@ public:
 // facial.mpkから変換
 struct FacialPose
 {
-	std::vector< JointPose > pose;
+	std::vector< JointPose > joint_pose;
 };
 
 struct FacialPoseArray
@@ -313,90 +351,105 @@ struct FacialPoseArray
 
 		for(int faceID=0; faceID < mpk.num[0].key.size(); faceID++)
 		{
-			facial_pose[faceID].pose.resize( 136 );	// メモリを大量に無駄にしているので後で変更する
+			facial_pose[faceID].joint_pose.resize( 136 );	// メモリを大量に無駄にしているので後で変更する
 
-			// 全体
 			for(int i=83; i<=95; i++)
 			{
-				facial_pose[faceID].pose[i].posX = mpk.num[0].key[faceID].ch[(i-83)*2].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[0].key[faceID].ch[(i-83)*2].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[0].key[faceID].ch[(i-83)*2].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[0].key[faceID].ch[(i-83)*2].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[0].key[faceID].ch[(i-83)*2].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[0].key[faceID].ch[(i-83)*2].data3 / 1000.0f;
 
-				facial_pose[faceID].pose[i].rotX = mpk.num[0].key[faceID].ch[(i-83)*2+1].data1 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotY = mpk.num[0].key[faceID].ch[(i-83)*2+1].data2 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotZ = mpk.num[0].key[faceID].ch[(i-83)*2+1].data3 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.x = mpk.num[0].key[faceID].ch[(i-83)*2+1].data1 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.y = mpk.num[0].key[faceID].ch[(i-83)*2+1].data2 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.z = mpk.num[0].key[faceID].ch[(i-83)*2+1].data3 / 32768.0f * D3DX_PI;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			{
 				int i=96;
-				facial_pose[faceID].pose[i].posX = mpk.num[0].key[faceID].ch[26].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[0].key[faceID].ch[26].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[0].key[faceID].ch[26].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[0].key[faceID].ch[26].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[0].key[faceID].ch[26].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[0].key[faceID].ch[26].data3 / 1000.0f;
 
-				facial_pose[faceID].pose[i].rotX = mpk.num[0].key[faceID].ch[27].data1 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotY = mpk.num[0].key[faceID].ch[27].data2 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotZ = mpk.num[0].key[faceID].ch[27].data3 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.x = mpk.num[0].key[faceID].ch[27].data1 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.y = mpk.num[0].key[faceID].ch[27].data2 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.z = mpk.num[0].key[faceID].ch[27].data3 / 32768.0f * D3DX_PI;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			{
 				int i=97;
-				facial_pose[faceID].pose[i].posX = mpk.num[0].key[faceID].ch[28].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[0].key[faceID].ch[28].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[0].key[faceID].ch[28].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[0].key[faceID].ch[28].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[0].key[faceID].ch[28].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[0].key[faceID].ch[28].data3 / 1000.0f;
 
-				facial_pose[faceID].pose[i].rotX = mpk.num[0].key[faceID].ch[29].data1 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotY = mpk.num[0].key[faceID].ch[29].data2 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotZ = mpk.num[0].key[faceID].ch[29].data3 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.x = mpk.num[0].key[faceID].ch[29].data1 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.y = mpk.num[0].key[faceID].ch[29].data2 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.z = mpk.num[0].key[faceID].ch[29].data3 / 32768.0f * D3DX_PI;
 
-				facial_pose[faceID].pose[i].scaleX = mpk.num[0].key[faceID].ch[30].data1 / 32768.0f * 2.0f;
-				facial_pose[faceID].pose[i].scaleY = mpk.num[0].key[faceID].ch[30].data2 / 32768.0f * 2.0f;
-				facial_pose[faceID].pose[i].scaleZ = mpk.num[0].key[faceID].ch[30].data3 / 32768.0f * 2.0f;
+				facial_pose[faceID].joint_pose[i].scale.x = mpk.num[0].key[faceID].ch[30].data1 / 32768.0f * 2.0f;
+				facial_pose[faceID].joint_pose[i].scale.y = mpk.num[0].key[faceID].ch[30].data2 / 32768.0f * 2.0f;
+				facial_pose[faceID].joint_pose[i].scale.z = mpk.num[0].key[faceID].ch[30].data3 / 32768.0f * 2.0f;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			{
 				int i=98;
-				facial_pose[faceID].pose[i].posX = mpk.num[0].key[faceID].ch[31].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[0].key[faceID].ch[31].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[0].key[faceID].ch[31].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[0].key[faceID].ch[31].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[0].key[faceID].ch[31].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[0].key[faceID].ch[31].data3 / 1000.0f;
 
-				facial_pose[faceID].pose[i].rotX = mpk.num[0].key[faceID].ch[32].data1 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotY = mpk.num[0].key[faceID].ch[32].data2 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotZ = mpk.num[0].key[faceID].ch[32].data3 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.x = mpk.num[0].key[faceID].ch[32].data1 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.y = mpk.num[0].key[faceID].ch[32].data2 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.z = mpk.num[0].key[faceID].ch[32].data3 / 32768.0f * D3DX_PI;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			{
 				int i=99;
-				facial_pose[faceID].pose[i].posX = mpk.num[0].key[faceID].ch[33].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[0].key[faceID].ch[33].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[0].key[faceID].ch[33].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[0].key[faceID].ch[33].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[0].key[faceID].ch[33].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[0].key[faceID].ch[33].data3 / 1000.0f;
 
-				facial_pose[faceID].pose[i].rotX = mpk.num[0].key[faceID].ch[34].data1 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotY = mpk.num[0].key[faceID].ch[34].data2 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotZ = mpk.num[0].key[faceID].ch[34].data3 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.x = mpk.num[0].key[faceID].ch[34].data1 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.y = mpk.num[0].key[faceID].ch[34].data2 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.z = mpk.num[0].key[faceID].ch[34].data3 / 32768.0f * D3DX_PI;
 
-				facial_pose[faceID].pose[i].scaleX = mpk.num[0].key[faceID].ch[35].data1 / 32768.0f * 2.0f;
-				facial_pose[faceID].pose[i].scaleY = mpk.num[0].key[faceID].ch[35].data2 / 32768.0f * 2.0f;
-				facial_pose[faceID].pose[i].scaleZ = mpk.num[0].key[faceID].ch[35].data3 / 32768.0f * 2.0f;
+				facial_pose[faceID].joint_pose[i].scale.x = mpk.num[0].key[faceID].ch[35].data1 / 32768.0f * 2.0f;
+				facial_pose[faceID].joint_pose[i].scale.y = mpk.num[0].key[faceID].ch[35].data2 / 32768.0f * 2.0f;
+				facial_pose[faceID].joint_pose[i].scale.z = mpk.num[0].key[faceID].ch[35].data3 / 32768.0f * 2.0f;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			for(int i=100; i<=135; i++)
 			{
-				facial_pose[faceID].pose[i].posX = mpk.num[0].key[faceID].ch[(i-82)*2].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[0].key[faceID].ch[(i-82)*2].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[0].key[faceID].ch[(i-82)*2].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[0].key[faceID].ch[(i-82)*2].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[0].key[faceID].ch[(i-82)*2].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[0].key[faceID].ch[(i-82)*2].data3 / 1000.0f;
 
-				facial_pose[faceID].pose[i].rotX = mpk.num[0].key[faceID].ch[(i-82)*2+1].data1 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotY = mpk.num[0].key[faceID].ch[(i-82)*2+1].data2 / 32768.0f * D3DX_PI;
-				facial_pose[faceID].pose[i].rotZ = mpk.num[0].key[faceID].ch[(i-82)*2+1].data3 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.x = mpk.num[0].key[faceID].ch[(i-82)*2+1].data1 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.y = mpk.num[0].key[faceID].ch[(i-82)*2+1].data2 / 32768.0f * D3DX_PI;
+				facial_pose[faceID].joint_pose[i].rot.z = mpk.num[0].key[faceID].ch[(i-82)*2+1].data3 / 32768.0f * D3DX_PI;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			// eye
 			for(int i=100; i< 122; i++)
 			{
-				facial_pose[faceID].pose[i].posX = mpk.num[3].key[faceID].ch[(i-100)*2].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[3].key[faceID].ch[(i-100)*2].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[3].key[faceID].ch[(i-100)*2].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[3].key[faceID].ch[(i-100)*2].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[3].key[faceID].ch[(i-100)*2].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[3].key[faceID].ch[(i-100)*2].data3 / 1000.0f;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 			// mouth
 			for(int i=122; i<136; i++)
 			{
-				facial_pose[faceID].pose[i].posX = mpk.num[6].key[faceID].ch[(i-122)*2].data1 / 1000.0f;
-				facial_pose[faceID].pose[i].posY = mpk.num[6].key[faceID].ch[(i-122)*2].data2 / 1000.0f;
-				facial_pose[faceID].pose[i].posZ = mpk.num[6].key[faceID].ch[(i-122)*2].data3 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.x = mpk.num[6].key[faceID].ch[(i-122)*2].data1 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.y = mpk.num[6].key[faceID].ch[(i-122)*2].data2 / 1000.0f;
+				facial_pose[faceID].joint_pose[i].translate.z = mpk.num[6].key[faceID].ch[(i-122)*2].data3 / 1000.0f;
+
+				facial_pose[faceID].joint_pose[i].CalcQuaternion();
 			}
 		}
 		return true;
@@ -404,7 +457,6 @@ struct FacialPoseArray
 };
 
 
-Pose PoseLerp(Pose& pose1, Pose& pose2, float t);
 FacialPose FacialPoseLerp(FacialPose& pose1, FacialPose& pose2, float t);
 
 

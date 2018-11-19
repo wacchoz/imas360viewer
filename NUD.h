@@ -16,8 +16,8 @@ namespace imas{
 
 struct Index
 {
-	std::vector<short> index;	// 生データ
-	std::vector<short> index_degenerate_triangle;	// indexをdegenerate triangleに変換
+	std::vector<short> index;	// raw index
+	std::vector<short> index_degenerate_triangle;	// converted to degenerated triangle index
 
 	int reserved;
 	int unknown;
@@ -38,7 +38,7 @@ struct Index
 			index[i] = pFile->ReadUInt16();
 		}
 
-		ConvertToDegenerateTriangle(); // 変換
+		ConvertToDegenerateTriangle();
 
 		return true;
 	}
@@ -91,8 +91,8 @@ struct Vertex
 
 	int unknown;
 
-	std::vector<D3DXVECTOR3> position;	// motionで更新される
-	std::vector<D3DXVECTOR3> normal;	// motionで更新される
+	std::vector<D3DXVECTOR3> position;	// updated by motion
+	std::vector<D3DXVECTOR3> normal;	// updated by motion
 	std::vector<D3DXVECTOR2> uv;
 
 	std::vector<D3DXVECTOR3> initial_position;
@@ -118,7 +118,7 @@ struct Vertex
 
 		switch( nType )
 		{
-			case 0xC100:		// キャラクタ
+			case 0xC100:		// Character
 				// メモリ確保
 				ID1.resize( nVertex );
 				ID2.resize( nVertex );
@@ -158,7 +158,7 @@ struct Vertex
 					w4[i] = pFile->ReadSingle();
 				}
 				break;
-			case 0x8300:			// 背景
+			case 0x8300:			// Background stage
 				ID1.resize( nVertex );
 				ID2.resize( nVertex );
 				ID3.resize( nVertex );
@@ -188,7 +188,7 @@ struct Vertex
 				}
 
 				break;
-			case 0x8100:		// アクセサリ
+			case 0x8100:		// Accessory
 				for(int i = 0; i < nVertex; i++)
 				{
 					// position
@@ -209,9 +209,9 @@ struct Vertex
 			default:
 				assert( 0 && "unknown vertex type");
 				break;
-		} // switch
+		} // end of switch
 
-		// コピーして初期状態を保存しておく
+		// Copy original position and normal
 		initial_position = position;
 		initial_normal = normal;
 
@@ -444,7 +444,7 @@ struct Mesh
 	int unknown2;
 	int unknown3;
 
-	int unknown_flag;;
+	int unknown_flag;
 
 	std::vector<Texture> texture;
 
@@ -768,13 +768,17 @@ public:
 						tmp = tmp +	pSkeleton->m_Joint[(*s).vertex.ID4[i]].matSkinningTransform * (*s).vertex.w4[i];
 					}
 
-					(*s).vertex.position[i].x = (*s).vertex.initial_position[i].x * tmp._11 + (*s).vertex.initial_position[i].y * tmp._21 + (*s).vertex.initial_position[i].z * tmp._31 + tmp._41;
-					(*s).vertex.position[i].y = (*s).vertex.initial_position[i].x * tmp._12 + (*s).vertex.initial_position[i].y * tmp._22 + (*s).vertex.initial_position[i].z * tmp._32 + tmp._42;
-					(*s).vertex.position[i].z = (*s).vertex.initial_position[i].x * tmp._13 + (*s).vertex.initial_position[i].y * tmp._23 + (*s).vertex.initial_position[i].z * tmp._33 + tmp._43;
+					D3DXVec3TransformCoord( &(*s).vertex.position[i], &(*s).vertex.initial_position[i], & tmp );
+					D3DXVec3TransformNormal( &(*s).vertex.normal[i], &(*s).vertex.initial_normal[i], & tmp );
 
-					(*s).vertex.normal[i].x = (*s).vertex.initial_normal[i].x * tmp._11 + (*s).vertex.initial_normal[i].y * tmp._21 + (*s).vertex.initial_normal[i].z * tmp._31;
-					(*s).vertex.normal[i].y = (*s).vertex.initial_normal[i].x * tmp._12 + (*s).vertex.initial_normal[i].y * tmp._22 + (*s).vertex.initial_normal[i].z * tmp._32;
-					(*s).vertex.normal[i].z = (*s).vertex.initial_normal[i].x * tmp._13 + (*s).vertex.initial_normal[i].y * tmp._23 + (*s).vertex.initial_normal[i].z * tmp._33;
+					//(*s).vertex.position[i].x = (*s).vertex.initial_position[i].x * tmp._11 + (*s).vertex.initial_position[i].y * tmp._21 + (*s).vertex.initial_position[i].z * tmp._31 + tmp._41;
+					//(*s).vertex.position[i].y = (*s).vertex.initial_position[i].x * tmp._12 + (*s).vertex.initial_position[i].y * tmp._22 + (*s).vertex.initial_position[i].z * tmp._32 + tmp._42;
+					//(*s).vertex.position[i].z = (*s).vertex.initial_position[i].x * tmp._13 + (*s).vertex.initial_position[i].y * tmp._23 + (*s).vertex.initial_position[i].z * tmp._33 + tmp._43;
+
+					//(*s).vertex.normal[i].x = (*s).vertex.initial_normal[i].x * tmp._11 + (*s).vertex.initial_normal[i].y * tmp._21 + (*s).vertex.initial_normal[i].z * tmp._31;
+					//(*s).vertex.normal[i].y = (*s).vertex.initial_normal[i].x * tmp._12 + (*s).vertex.initial_normal[i].y * tmp._22 + (*s).vertex.initial_normal[i].z * tmp._32;
+					//(*s).vertex.normal[i].z = (*s).vertex.initial_normal[i].x * tmp._13 + (*s).vertex.initial_normal[i].y * tmp._23 + (*s).vertex.initial_normal[i].z * tmp._33;
+
 				}
 
 			}
