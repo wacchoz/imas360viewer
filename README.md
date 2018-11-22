@@ -19,16 +19,16 @@ This software is the dance stage viewer "THE IDOLM@STER"(Xbox360) and "THE IDOLM
 
 Skinning correction is not implemented yet. So sometimes "candy-wrapper" phenomenon will be seen.
 
-This software is developed referencing some other viewer (not distributed anymore).  
+This software was developed referencing some other viewer (not distributed anymore).  
 Most efforts to analyze file formats were made by great forerunners.
 
 
 # Usage
 
 You need to do ripping data from Xbox360 disk before using.  
-Executable file is in release directory.  
-Rewrite the setting.ini file.
 
+Executable file is in release directory.  
+Rewrite the setting.ini file.  
 The following is the sample of setting.ini.  
 Write the paths of character bna files in CharaBNA* section,  
 and dance motion bna file in danceBNA section,  
@@ -60,24 +60,24 @@ and music file in aix section.
 ## Release 1.1
 
 - Physics simulation
-<img src="./image/mas_phys.png" height=400>
+<img src="https://github.com/wacchoz/imas360viewer/blob/master/image/mas_phys.png" width=600>
 
 ## Release 1.0
 
 - Dance motion, song and music, lyrics
-<img src="./image/gmw.png" height=400>
+<img src="https://github.com/wacchoz/imas360viewer/blob/master/image/gmw.png" width=600>
 
 
 ## Release 0.1
 Rendering with Cg shader
 
-<img src="./image/yayoi_glui3.png" width=400>
+<img src="https://github.com/wacchoz/imas360viewer/blob/master/image/yayoi_glui3.png" width=400>
 
 ## Release 0.0
 Simple model viewer
 
-<img src="./image/yayoi_glui1.png" width=400>
-<img src="./image/yayoi_glui2.png" width=400>
+<img src="https://github.com/wacchoz/imas360viewer/blob/master/image/yayoi_glui1.png" width=400>
+<img src="https://github.com/wacchoz/imas360viewer/blob/master/image/yayoi_glui2.png" width=400>
 
 
 
